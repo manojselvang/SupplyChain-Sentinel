@@ -34,3 +34,5 @@ app:
     username: ""
     password: ""
     email: ""
+  ci:
+    ingestion-api-key: test-ingestion-key-for-ci-pipeline-integration

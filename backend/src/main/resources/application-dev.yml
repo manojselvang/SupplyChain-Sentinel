@@ -23,3 +23,5 @@ app:
   jwt:
     secret: ${JWT_SECRET:dev-only-secret-key-change-me-in-production-at-least-32-characters-long}
     cookie-secure: ${APP_COOKIE_SECURE:false}
+  ci:
+    ingestion-api-key: ${CI_INGESTION_API_KEY:dev-only-ingestion-key-change-me}

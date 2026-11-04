@@ -39,15 +39,18 @@ import java.time.Instant;
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final IngestionKeyFilter ingestionKeyFilter;
     private final CustomUserDetailsService userDetailsService;
     private final ObjectMapper objectMapper;
 
     public SecurityConfig(
             JwtAuthenticationFilter jwtAuthenticationFilter,
+            IngestionKeyFilter ingestionKeyFilter,
             CustomUserDetailsService userDetailsService,
             ObjectMapper objectMapper
     ) {
         this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+        this.ingestionKeyFilter = ingestionKeyFilter;
         this.userDetailsService = userDetailsService;
         this.objectMapper = objectMapper;
     }
@@ -64,6 +67,7 @@ public class SecurityConfig {
                     "/api/v1/auth/login",
                     "/api/v1/auth/refresh",
                     "/api/v1/ping",
+                    "/api/v1/integrations/**",
                     "/actuator/health",
                     "/swagger-ui/**",
                     "/api-docs/**",
@@ -96,7 +100,8 @@ public class SecurityConfig {
                     response.getWriter().write(objectMapper.writeValueAsString(body));
                 })
             )
-            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+            .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
+            .addFilterBefore(ingestionKeyFilter, JwtAuthenticationFilter.class);
 
         return http.build();
     }

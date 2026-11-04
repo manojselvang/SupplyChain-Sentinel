@@ -4,9 +4,10 @@ import PageHeader from '../components/PageHeader'
 import ConfirmDialog from '../components/ConfirmDialog'
 import ApplicationFormModal from './ApplicationFormModal'
 import { getApplication, deleteApplication } from '../api/applications'
+import { getApplicationPipelineRuns } from '../api/pipelineRuns'
 import { extractApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import type { Application } from '../types'
+import type { Application, PipelineRun, Page } from '../types'
 
 // ── Detail field component ─────────────────────────────────
 
@@ -49,6 +50,10 @@ export default function ApplicationDetail() {
   const [deleteOpen, setDeleteOpen] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
+  // Pipeline history state
+  const [pipelineRuns, setPipelineRuns] = useState<Page<PipelineRun> | null>(null)
+  const [pipelineLoading, setPipelineLoading] = useState(false)
+
   const fetchApp = useCallback(async () => {
     if (!id) return
     setLoading(true)
@@ -63,9 +68,23 @@ export default function ApplicationDetail() {
     }
   }, [id])
 
+  const fetchPipelineRuns = useCallback(async () => {
+    if (!id) return
+    setPipelineLoading(true)
+    try {
+      const result = await getApplicationPipelineRuns(id, 0, 10)
+      setPipelineRuns(result)
+    } catch {
+      // Silently fail — pipeline history is supplementary
+    } finally {
+      setPipelineLoading(false)
+    }
+  }, [id])
+
   useEffect(() => {
     fetchApp()
-  }, [fetchApp])
+    fetchPipelineRuns()
+  }, [fetchApp, fetchPipelineRuns])
 
   const handleDelete = async () => {
     if (!app) return
@@ -185,11 +204,63 @@ export default function ApplicationDetail() {
         </div>
       </div>
 
+      {/* Pipeline history */}
+      <div className="card overflow-hidden mb-4">
+        <h3 className="text-sm font-medium text-sentinel-200 px-5 py-4 border-b border-sentinel-800">
+          Pipeline History
+        </h3>
+        {pipelineLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="w-6 h-6 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : !pipelineRuns || pipelineRuns.content.length === 0 ? (
+          <div className="px-5 py-8 text-center text-sentinel-500 text-sm">
+            No pipeline runs yet for this application.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-sentinel-850 border-b border-sentinel-800">
+                <tr className="text-left text-sentinel-400">
+                  <th className="px-4 py-3 font-medium">Provider</th>
+                  <th className="px-4 py-3 font-medium">Workflow</th>
+                  <th className="px-4 py-3 font-medium">Branch</th>
+                  <th className="px-4 py-3 font-medium">Commit</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Started</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pipelineRuns.content.map((run) => {
+                  const statusCls = run.status === 'SUCCESS'
+                    ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                    : run.status === 'FAILED'
+                    ? 'bg-red-500/15 text-red-400 border border-red-500/30'
+                    : run.status === 'RUNNING'
+                    ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                    : 'bg-sentinel-700/40 text-sentinel-400 border border-sentinel-600/50'
+                  return (
+                    <tr key={run.id} className="border-b border-sentinel-800/50 hover:bg-sentinel-850/50 transition-colors">
+                      <td className="px-4 py-3 text-sentinel-400 text-xs">{run.provider.replace('_', ' ')}</td>
+                      <td className="px-4 py-3 text-sentinel-300">{run.workflowName || '—'}</td>
+                      <td className="px-4 py-3 text-sentinel-400 font-mono text-xs">{run.branchName || '—'}</td>
+                      <td className="px-4 py-3 text-sentinel-400 font-mono text-xs">{run.commitSha ? run.commitSha.substring(0, 8) : '—'}</td>
+                      <td className="px-4 py-3"><span className={`badge ${statusCls}`}>{run.status}</span></td>
+                      <td className="px-4 py-3 text-sentinel-400 text-xs">{run.startedAt ? new Date(run.startedAt).toLocaleString() : '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Edit modal */}
       <ApplicationFormModal
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        onSaved={fetchApp}
+        onSaved={() => { fetchApp(); fetchPipelineRuns() }}
         app={app}
       />
 

@@ -3,8 +3,11 @@ package com.supplychainsentinel.service;
 import com.supplychainsentinel.dto.DashboardSummaryDto;
 import com.supplychainsentinel.dto.DistributionEntry;
 import com.supplychainsentinel.dto.RecentApplicationDto;
+import com.supplychainsentinel.dto.RecentPipelineRunDto;
 import com.supplychainsentinel.entity.InventoryApplication;
+import com.supplychainsentinel.entity.PipelineRun;
 import com.supplychainsentinel.repository.ApplicationRepository;
+import com.supplychainsentinel.repository.PipelineRunRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -23,9 +26,14 @@ import java.util.List;
 public class DashboardService {
 
     private final ApplicationRepository applicationRepository;
+    private final PipelineRunRepository pipelineRunRepository;
 
-    public DashboardService(ApplicationRepository applicationRepository) {
+    public DashboardService(
+            ApplicationRepository applicationRepository,
+            PipelineRunRepository pipelineRunRepository
+    ) {
         this.applicationRepository = applicationRepository;
+        this.pipelineRunRepository = pipelineRunRepository;
     }
 
     @Transactional(readOnly = true)
@@ -60,10 +68,38 @@ public class DashboardService {
                 ))
                 .toList();
 
+        // ── Pipeline KPI counts ────────────────────────────────
+        long totalPipelineRuns = pipelineRunRepository.countAllRuns();
+        long successfulPipelineRuns = pipelineRunRepository.countSuccessful();
+        long failedPipelineRuns = pipelineRunRepository.countFailed();
+        double successRate = totalPipelineRuns > 0
+                ? (successfulPipelineRuns * 100.0 / totalPipelineRuns)
+                : 0.0;
+
+        // ── Recent pipeline runs (top 5 by started_at desc) ─────
+        List<PipelineRun> recentRuns = pipelineRunRepository
+                .findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "startedAt")))
+                .getContent();
+
+        List<RecentPipelineRunDto> recentPipelineDtos = recentRuns.stream()
+                .map(run -> new RecentPipelineRunDto(
+                        run.getId(),
+                        run.getApplication().getName(),
+                        run.getProvider(),
+                        run.getWorkflowName(),
+                        run.getStatus(),
+                        run.getBranchName(),
+                        run.getStartedAt(),
+                        run.getCompletedAt()
+                ))
+                .toList();
+
         return new DashboardSummaryDto(
                 total, active, critical, highCriticality, internetFacing, highCriticalInternetFacing,
                 criticalityDist, lifecycleDist, hostingDist, businessUnitDist,
-                recentApps
+                recentApps,
+                totalPipelineRuns, successfulPipelineRuns, failedPipelineRuns, successRate,
+                recentPipelineDtos
         );
     }
 }

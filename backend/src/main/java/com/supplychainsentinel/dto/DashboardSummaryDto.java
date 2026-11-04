@@ -26,5 +26,14 @@ public record DashboardSummaryDto(
         List<DistributionEntry> businessUnitDistribution,
 
         // ── Recent applications (top 5 by updated_at) ─────
-        List<RecentApplicationDto> recentApplications
+        List<RecentApplicationDto> recentApplications,
+
+        // ── Pipeline KPI counts ──────────────────────────
+        long totalPipelineRuns,
+        long successfulPipelineRuns,
+        long failedPipelineRuns,
+        double pipelineSuccessRate,
+
+        // ── Recent pipeline runs (top 5 by started_at desc) ─
+        List<RecentPipelineRunDto> recentPipelineRuns
 ) {}

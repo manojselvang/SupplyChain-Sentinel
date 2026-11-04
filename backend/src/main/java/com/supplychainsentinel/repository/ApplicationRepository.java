@@ -22,6 +22,8 @@ public interface ApplicationRepository extends JpaRepository<InventoryApplicatio
 
     boolean existsByApplicationKey(String applicationKey);
 
+    java.util.Optional<InventoryApplication> findByApplicationKey(String applicationKey);
+
     // ── Dashboard aggregation queries ─────────────────────────
 
     @Query("SELECT COUNT(a) FROM InventoryApplication a WHERE a.lifecycleStatus = 'ACTIVE'")

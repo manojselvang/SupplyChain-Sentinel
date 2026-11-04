@@ -122,6 +122,11 @@ export interface DashboardSummary {
   hostingEnvironmentDistribution: DistributionEntry[]
   businessUnitDistribution: DistributionEntry[]
   recentApplications: RecentApplication[]
+  totalPipelineRuns: number
+  successfulPipelineRuns: number
+  failedPipelineRuns: number
+  pipelineSuccessRate: number
+  recentPipelineRuns: RecentPipelineRun[]
 }
 
 export interface DistributionEntry {
@@ -137,3 +142,42 @@ export interface RecentApplication {
   lifecycleStatus: string
   updatedAt: string
 }
+
+// ── Pipeline Runs ──────────────────────────────────────────
+
+export interface PipelineRun {
+  id: string
+  applicationId: string
+  applicationName: string
+  provider: string
+  externalRunId: string
+  workflowName: string | null
+  repositoryUrl: string
+  branchName: string | null
+  commitSha: string | null
+  commitMessage: string | null
+  runNumber: string | null
+  status: string
+  triggerEvent: string | null
+  startedAt: string | null
+  completedAt: string | null
+  artifactName: string | null
+  artifactVersion: string | null
+  artifactDigest: string | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface RecentPipelineRun {
+  id: string
+  applicationName: string
+  provider: string
+  workflowName: string | null
+  status: string
+  branchName: string | null
+  startedAt: string
+  completedAt: string | null
+}
+
+export const PIPELINE_PROVIDERS = ['JENKINS', 'GITHUB_ACTIONS'] as const
+export const PIPELINE_STATUSES = ['QUEUED', 'RUNNING', 'SUCCESS', 'FAILED', 'CANCELLED'] as const
