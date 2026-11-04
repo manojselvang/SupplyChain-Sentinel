@@ -1,0 +1,33 @@
+# Environment
+.env
+.env.*
+!.env.example
+*.env.local
+
+# Backend
+backend/target/
+backend/.env
+backend/*.log
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+frontend/*.log
+frontend/*.tsbuildinfo
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# PostgreSQL local instance
+tools/
+
+# Logs and temporary files
+*.log
+*.tmp

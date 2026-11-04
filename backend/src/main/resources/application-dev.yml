@@ -1,0 +1,25 @@
+# Dev profile - local PostgreSQL
+# Override via environment variables as needed
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:supplychain_sentinel}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+
+logging:
+  level:
+    com.supplychainsentinel: DEBUG
+    org.flywaydb: INFO
+    org.springframework.security: DEBUG
+
+# Dev-only default JWT secret (override via JWT_SECRET env var)
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-secret-key-change-me-in-production-at-least-32-characters-long}
+    cookie-secure: ${APP_COOKIE_SECURE:false}

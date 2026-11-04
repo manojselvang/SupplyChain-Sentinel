@@ -1,0 +1,83 @@
+version: "3.9"
+
+services:
+  # ──────────────────────────────────────────────
+  # PostgreSQL
+  # ──────────────────────────────────────────────
+  postgres:
+    image: postgres:17-alpine
+    container_name: scs-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-supplychain_sentinel}
+      POSTGRES_USER: ${DB_USERNAME:-scsentinel}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-scsentinel}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-scsentinel} -d ${DB_NAME:-supplychain_sentinel}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - scs-net
+
+  # ──────────────────────────────────────────────
+  # Backend (Spring Boot)
+  # ──────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: scs-backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-supplychain_sentinel}
+      DB_USERNAME: ${DB_USERNAME:-scsentinel}
+      DB_PASSWORD: ${DB_PASSWORD:-scsentinel}
+      APP_CORS_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:5173
+      SERVER_PORT: 8080
+      JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret-in-production-at-least-32-characters-long}
+      APP_COOKIE_SECURE: "false"
+      INITIAL_ADMIN_USERNAME: ${INITIAL_ADMIN_USERNAME:-admin}
+      INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-changeme123}
+      INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@supplychainsentinel.local}
+    ports:
+      - "8080:8080"
+    networks:
+      - scs-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # ──────────────────────────────────────────────
+  # Frontend (Vite build served by Nginx)
+  # ──────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: scs-frontend
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "3000:80"
+    networks:
+      - scs-net
+
+volumes:
+  pgdata:
+
+networks:
+  scs-net:
+    driver: bridge

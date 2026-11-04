@@ -1,0 +1,86 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  body {
+    @apply bg-sentinel-950 text-sentinel-200 antialiased;
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.sentinel.700') transparent;
+  }
+
+  /* Webkit scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: theme('colors.sentinel.950');
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-sentinel-700 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-sentinel-600;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-sentinel-900 border border-sentinel-800 rounded-lg;
+  }
+
+  .btn-primary {
+    @apply px-4 py-2 bg-accent-500 hover:bg-accent-600 text-white font-medium rounded-lg transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply px-4 py-2 bg-sentinel-800 hover:bg-sentinel-700 text-sentinel-200 font-medium rounded-lg transition-colors duration-150 border border-sentinel-700;
+  }
+
+  .input-field {
+    @apply w-full px-3 py-2 bg-sentinel-850 border border-sentinel-700 rounded-lg text-sentinel-100 placeholder-sentinel-400 focus:outline-none focus:ring-2 focus:ring-accent-500 focus:border-transparent transition-colors;
+  }
+
+  .nav-link {
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sentinel-300 hover:text-sentinel-100 hover:bg-sentinel-800 transition-colors duration-150 cursor-pointer;
+  }
+
+  .nav-link-active {
+    @apply text-accent-400 bg-sentinel-800;
+  }
+
+  .badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-medium;
+  }
+
+  .badge-critical {
+    @apply bg-red-500/15 text-red-400 border border-red-500/30;
+  }
+
+  .badge-high {
+    @apply bg-accent-500/15 text-accent-400 border border-accent-500/30;
+  }
+
+  .badge-medium {
+    @apply bg-amber-500/15 text-amber-400 border border-amber-500/30;
+  }
+
+  .badge-low {
+    @apply bg-blue-500/15 text-blue-400 border border-blue-500/30;
+  }
+
+  .badge-info {
+    @apply bg-sentinel-700/40 text-sentinel-300 border border-sentinel-600/50;
+  }
+}

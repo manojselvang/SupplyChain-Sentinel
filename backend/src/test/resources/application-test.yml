@@ -1,0 +1,36 @@
+# Test profile - uses the local PostgreSQL instance
+# For CI/CD this would point to a ephemeral test database
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5433}/${DB_NAME:supplychain_sentinel_test}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+logging:
+  level:
+    com.supplychainsentinel: WARN
+    org.springframework: WARN
+    org.flywaydb: WARN
+
+# Test-only JWT configuration
+app:
+  jwt:
+    secret: test-secret-key-for-unit-tests-at-least-32-characters-long
+    issuer: supplychain-sentinel
+    access-token-ttl-minutes: 15
+    refresh-token-ttl-days: 7
+    cookie-secure: false
+    max-login-attempts: 5
+    lockout-duration-minutes: 15
+  admin:
+    username: ""
+    password: ""
+    email: ""

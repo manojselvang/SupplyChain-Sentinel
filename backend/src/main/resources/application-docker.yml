@@ -1,0 +1,20 @@
+# Docker profile - PostgreSQL running in docker-compose
+spring:
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:postgres}:${DB_PORT:5432}/${DB_NAME:supplychain_sentinel}
+    username: ${DB_USERNAME:scsentinel}
+    password: ${DB_PASSWORD:scsentinel}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    com.supplychainsentinel: INFO
+    org.flywaydb: INFO
+
+# Docker-only JWT defaults (override JWT_SECRET in compose for production)
+app:
+  jwt:
+    secret: ${JWT_SECRET:change-this-jwt-secret-in-production-at-least-32-characters-long}
+    cookie-secure: ${APP_COOKIE_SECURE:false}
