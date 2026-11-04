@@ -1,9 +1,12 @@
 package com.supplychainsentinel.repository;
 
+import com.supplychainsentinel.dto.DistributionEntry;
 import com.supplychainsentinel.entity.InventoryApplication;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Query;
 
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -18,4 +21,37 @@ public interface ApplicationRepository extends JpaRepository<InventoryApplicatio
         JpaSpecificationExecutor<InventoryApplication> {
 
     boolean existsByApplicationKey(String applicationKey);
+
+    // ── Dashboard aggregation queries ─────────────────────────
+
+    @Query("SELECT COUNT(a) FROM InventoryApplication a WHERE a.lifecycleStatus = 'ACTIVE'")
+    long countActive();
+
+    @Query("SELECT COUNT(a) FROM InventoryApplication a WHERE a.criticality = 'CRITICAL'")
+    long countCritical();
+
+    @Query("SELECT COUNT(a) FROM InventoryApplication a WHERE a.criticality = 'HIGH'")
+    long countHighCriticality();
+
+    @Query("SELECT COUNT(a) FROM InventoryApplication a WHERE a.internetFacing = true")
+    long countInternetFacing();
+
+    @Query("SELECT COUNT(a) FROM InventoryApplication a WHERE a.criticality IN ('HIGH','CRITICAL') AND a.internetFacing = true")
+    long countHighCriticalInternetFacing();
+
+    @Query("SELECT new com.supplychainsentinel.dto.DistributionEntry(a.criticality, COUNT(a)) " +
+           "FROM InventoryApplication a GROUP BY a.criticality")
+    List<DistributionEntry> distributionByCriticality();
+
+    @Query("SELECT new com.supplychainsentinel.dto.DistributionEntry(a.lifecycleStatus, COUNT(a)) " +
+           "FROM InventoryApplication a GROUP BY a.lifecycleStatus")
+    List<DistributionEntry> distributionByLifecycleStatus();
+
+    @Query("SELECT new com.supplychainsentinel.dto.DistributionEntry(a.hostingEnvironment, COUNT(a)) " +
+           "FROM InventoryApplication a GROUP BY a.hostingEnvironment")
+    List<DistributionEntry> distributionByHostingEnvironment();
+
+    @Query("SELECT new com.supplychainsentinel.dto.DistributionEntry(a.businessUnit, COUNT(a)) " +
+           "FROM InventoryApplication a WHERE a.businessUnit IS NOT NULL GROUP BY a.businessUnit")
+    List<DistributionEntry> distributionByBusinessUnit();
 }

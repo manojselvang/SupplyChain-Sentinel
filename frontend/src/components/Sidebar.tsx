@@ -146,8 +146,8 @@ export default function Sidebar({ open, onClose }: { open: boolean; onClose: () 
 
         {/* Footer */}
         <div className="px-5 py-3 border-t border-sentinel-800 shrink-0">
-          <p className="text-xs text-sentinel-400">v0.1.0 · Phase 1</p>
-          <p className="text-xs text-sentinel-500 mt-0.5">Simulated demo data</p>
+          <p className="text-xs text-sentinel-400">v0.1.0</p>
+          <p className="text-xs text-sentinel-500 mt-0.5">Backend-driven data</p>
         </div>
       </aside>
     </>

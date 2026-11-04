@@ -239,7 +239,7 @@ The platform uses a stateless JWT authentication strategy with refresh-token rot
 | `GET /ping` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | `GET /actuator/health` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 
-> **Separation of duties:** A developer cannot approve their own release. This business rule will be enforced in Phase 9 (Release Management) when approval endpoints are implemented.
+> **Separation of duties:** A developer cannot approve their own release. This business rule will be enforced in Phase 8 when approval endpoints are implemented.
 
 ---
 
@@ -261,6 +261,20 @@ The platform uses a stateless JWT authentication strategy with refresh-token rot
 | `POST` | `/api/v1/users` | ADMIN | Create a new user |
 | `PUT` | `/api/v1/users/{id}` | ADMIN | Update user (email, roles, enabled, password) |
 | `DELETE` | `/api/v1/users/{id}` | ADMIN | Delete a user |
+
+### Application Inventory
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/applications` | Any role | List applications (search, filter, paginate, sort) |
+| `GET` | `/api/v1/applications/{id}` | Any role | Get application by ID |
+| `POST` | `/api/v1/applications` | ADMIN, SECURITY_ENGINEER | Register a new application |
+| `PUT` | `/api/v1/applications/{id}` | ADMIN, SECURITY_ENGINEER | Update an application |
+| `DELETE` | `/api/v1/applications/{id}` | ADMIN | Delete an application |
+
+### Dashboard
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/v1/dashboard/summary` | Any role | KPI counts, distribution metrics, recent applications |
 
 ### Health
 | Method | Path | Auth | Description |
@@ -325,6 +339,7 @@ Flyway manages schema evolution. Migrations are append-only and never modified o
 |---------|-------------|
 | V1 | Initial schema: `users`, `roles`, `user_roles` + 5 seeded roles |
 | V2 | Auth schema: `refresh_tokens` table, login tracking columns on `users` |
+| V3 | Application inventory: `applications` table with CHECK constraints and indexes |
 
 ---
 
@@ -342,10 +357,12 @@ Tests run against a **dedicated test database** (`supplychain_sentinel_test`) to
 | Test Class | Tests | Covers |
 |-----------|-------|--------|
 | `AuthIntegrationTest` | 23 | Login, invalid credentials, disabled user, expired token, invalid signature, refresh rotation, revoked token, logout, RBAC (all 5 roles), cookie attributes |
+| `ApplicationIntegrationTest` | 26 | Application CRUD, search, filter, pagination, sorting, validation, RBAC (all 5 roles) |
+| `DashboardIntegrationTest` | 13 | KPI counts, distributions, recent applications, empty database, RBAC (5 roles), 401 |
 | `HealthControllerTest` | 1 | Ping endpoint |
 | `SupplyChainSentinelApplicationTests` | 1 | Context loads with Security + JPA + Flyway |
 
-**Total: 25 tests, 0 failures.**
+**Total: 64 tests, 0 failures.**
 
 ### Frontend Build
 
@@ -360,18 +377,14 @@ npm run build    # TypeScript type-check + Vite production build
 
 | Phase | Description | Status |
 |-------|-------------|--------|
-| 1 | Project structure, frontend & backend foundation, PostgreSQL, Docker Compose | ✅ Complete |
-| 2 | Authentication, JWT, RBAC | ✅ Complete |
-| 3 | Application inventory | Planned |
-| 4 | Executive dashboard | Planned |
-| 5 | Pipeline metadata ingestion | Planned |
-| 6 | Security findings and scanner report ingestion | Planned |
-| 7 | SBOM management | Planned |
-| 8 | Release risk assessment engine | Planned |
-| 9 | Release management and approvals | Planned |
-| 10 | Artifact integrity and Cosign verification | Planned |
-| 11 | Audit trail and security policy management | Planned |
-| 12 | Integration testing, security hardening, deployment readiness | Planned |
+| 1 | Project foundation | ✅ Complete |
+| 2 | Authentication, JWT and RBAC | ✅ Complete |
+| 3 | Application Inventory | ✅ Complete |
+| 4 | Executive Dashboard | ✅ Complete |
+| 5 | CI/CD Pipeline Integration and Build Metadata | Planned |
+| 6 | Security Findings and Vulnerability Management | Planned |
+| 7 | SBOM Management and Artifact Integrity | Planned |
+| 8 | Release Risk Assessment, Release Gates, Approvals, Audit Trail and Deployment Readiness | Planned |
 
 ---
 

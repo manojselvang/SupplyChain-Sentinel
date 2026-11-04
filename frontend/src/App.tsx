@@ -4,6 +4,7 @@ import ProtectedRoute from './routes/ProtectedRoute'
 import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Applications from './pages/Applications'
+import ApplicationDetail from './pages/ApplicationDetail'
 import Pipelines from './pages/Pipelines'
 import Findings from './pages/Findings'
 import Sbom from './pages/Sbom'
@@ -26,6 +27,7 @@ export default function App() {
       >
         <Route index element={<Dashboard />} />
         <Route path="applications" element={<Applications />} />
+        <Route path="applications/:id" element={<ApplicationDetail />} />
         <Route path="pipelines" element={<Pipelines />} />
         <Route path="findings" element={<Findings />} />
         <Route path="sbom" element={<Sbom />} />
