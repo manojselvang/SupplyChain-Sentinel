@@ -127,6 +127,11 @@ export interface DashboardSummary {
   failedPipelineRuns: number
   pipelineSuccessRate: number
   recentPipelineRuns: RecentPipelineRun[]
+  openFindings: number
+  criticalOpenFindings: number
+  highOpenFindings: number
+  openFindingsBySeverity: DistributionEntry[]
+  recentFindings: RecentFinding[]
 }
 
 export interface DistributionEntry {
@@ -181,3 +186,41 @@ export interface RecentPipelineRun {
 
 export const PIPELINE_PROVIDERS = ['JENKINS', 'GITHUB_ACTIONS'] as const
 export const PIPELINE_STATUSES = ['QUEUED', 'RUNNING', 'SUCCESS', 'FAILED', 'CANCELLED'] as const
+
+// ── Security Findings ──────────────────────────────────────
+
+export interface SecurityFinding {
+  id: string
+  applicationId: string
+  applicationName: string
+  pipelineRunId: string | null
+  scanner: string
+  vulnerabilityId: string | null
+  ruleId: string | null
+  title: string
+  description: string | null
+  severity: string
+  affectedPackage: string | null
+  installedVersion: string | null
+  fixedVersion: string | null
+  affectedLocation: string | null
+  remediationUrl: string | null
+  status: string
+  firstSeen: string
+  lastSeen: string
+  updatedAt: string
+}
+
+export interface RecentFinding {
+  id: string
+  applicationName: string
+  title: string
+  vulnerabilityId: string | null
+  severity: string
+  scanner: string
+  status: string
+  lastSeen: string
+}
+
+export const FINDING_SEVERITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO', 'UNKNOWN'] as const
+export const FINDING_STATUSES = ['OPEN', 'ACKNOWLEDGED', 'REMEDIATED', 'ACCEPTED'] as const

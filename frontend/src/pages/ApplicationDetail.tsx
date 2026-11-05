@@ -5,9 +5,10 @@ import ConfirmDialog from '../components/ConfirmDialog'
 import ApplicationFormModal from './ApplicationFormModal'
 import { getApplication, deleteApplication } from '../api/applications'
 import { getApplicationPipelineRuns } from '../api/pipelineRuns'
+import { getApplicationSecurityFindings } from '../api/securityFindings'
 import { extractApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import type { Application, PipelineRun, Page } from '../types'
+import type { Application, PipelineRun, SecurityFinding, Page } from '../types'
 
 // ── Detail field component ─────────────────────────────────
 
@@ -54,6 +55,10 @@ export default function ApplicationDetail() {
   const [pipelineRuns, setPipelineRuns] = useState<Page<PipelineRun> | null>(null)
   const [pipelineLoading, setPipelineLoading] = useState(false)
 
+  // Security findings state
+  const [findings, setFindings] = useState<Page<SecurityFinding> | null>(null)
+  const [findingsLoading, setFindingsLoading] = useState(false)
+
   const fetchApp = useCallback(async () => {
     if (!id) return
     setLoading(true)
@@ -81,10 +86,24 @@ export default function ApplicationDetail() {
     }
   }, [id])
 
+  const fetchFindings = useCallback(async () => {
+    if (!id) return
+    setFindingsLoading(true)
+    try {
+      const result = await getApplicationSecurityFindings(id, 0, 10)
+      setFindings(result)
+    } catch {
+      // Silently fail — findings are supplementary
+    } finally {
+      setFindingsLoading(false)
+    }
+  }, [id])
+
   useEffect(() => {
     fetchApp()
     fetchPipelineRuns()
-  }, [fetchApp, fetchPipelineRuns])
+    fetchFindings()
+  }, [fetchApp, fetchPipelineRuns, fetchFindings])
 
   const handleDelete = async () => {
     if (!app) return
@@ -256,11 +275,66 @@ export default function ApplicationDetail() {
         )}
       </div>
 
+      {/* Security findings */}
+      <div className="card overflow-hidden mb-4">
+        <h3 className="text-sm font-medium text-sentinel-200 px-5 py-4 border-b border-sentinel-800">
+          Security Findings
+        </h3>
+        {findingsLoading ? (
+          <div className="flex items-center justify-center py-8">
+            <div className="w-6 h-6 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : !findings || findings.content.length === 0 ? (
+          <div className="px-5 py-8 text-center text-sentinel-500 text-sm">
+            No security findings for this application.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-sentinel-850 border-b border-sentinel-800">
+                <tr className="text-left text-sentinel-400">
+                  <th className="px-4 py-3 font-medium">Title</th>
+                  <th className="px-4 py-3 font-medium">CVE / Rule</th>
+                  <th className="px-4 py-3 font-medium">Severity</th>
+                  <th className="px-4 py-3 font-medium">Scanner</th>
+                  <th className="px-4 py-3 font-medium">Package</th>
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Last Seen</th>
+                </tr>
+              </thead>
+              <tbody>
+                {findings.content.map((f) => {
+                  const sevCls = f.severity === 'CRITICAL' ? 'badge-critical'
+                    : f.severity === 'HIGH' ? 'badge-high'
+                    : f.severity === 'MEDIUM' ? 'badge-medium'
+                    : f.severity === 'LOW' ? 'badge-low' : 'badge-info'
+                  const statCls = f.status === 'OPEN' ? 'bg-red-500/15 text-red-400 border border-red-500/30'
+                    : f.status === 'ACKNOWLEDGED' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                    : f.status === 'REMEDIATED' ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                    : 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                  return (
+                    <tr key={f.id} className="border-b border-sentinel-800/50 hover:bg-sentinel-850/50 transition-colors">
+                      <td className="px-4 py-3 text-sentinel-200">{f.title}</td>
+                      <td className="px-4 py-3 text-sentinel-400 font-mono text-xs">{f.vulnerabilityId || f.ruleId || '—'}</td>
+                      <td className="px-4 py-3"><span className={`badge ${sevCls}`}>{f.severity}</span></td>
+                      <td className="px-4 py-3 text-sentinel-400 text-xs">{f.scanner}</td>
+                      <td className="px-4 py-3 text-sentinel-400">{f.affectedPackage || '—'}</td>
+                      <td className="px-4 py-3"><span className={`badge ${statCls}`}>{f.status}</span></td>
+                      <td className="px-4 py-3 text-sentinel-400 text-xs">{f.lastSeen ? new Date(f.lastSeen).toLocaleString() : '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       {/* Edit modal */}
       <ApplicationFormModal
         open={formOpen}
         onClose={() => setFormOpen(false)}
-        onSaved={() => { fetchApp(); fetchPipelineRuns() }}
+        onSaved={() => { fetchApp(); fetchPipelineRuns(); fetchFindings() }}
         app={app}
       />
 

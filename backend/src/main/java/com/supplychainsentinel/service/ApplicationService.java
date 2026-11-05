@@ -9,6 +9,7 @@ import com.supplychainsentinel.exception.ResourceNotFoundException;
 import com.supplychainsentinel.mapper.ApplicationMapper;
 import com.supplychainsentinel.repository.ApplicationRepository;
 import jakarta.persistence.criteria.Predicate;
+import org.springframework.dao.DataAccessException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -134,6 +135,14 @@ public class ApplicationService {
         if (!applicationRepository.existsById(id)) {
             throw new ResourceNotFoundException("Application not found: " + id);
         }
-        applicationRepository.deleteById(id);
+        try {
+            applicationRepository.deleteById(id);
+            applicationRepository.flush();
+        } catch (DataAccessException e) {
+            // FK RESTRICT constraint or Hibernate entity-state issue
+            throw new AuthException(
+                    "Cannot delete application — dependent records exist (pipeline runs or security findings)",
+                    HttpStatus.CONFLICT);
+        }
     }
 }

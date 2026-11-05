@@ -3,11 +3,14 @@ package com.supplychainsentinel.service;
 import com.supplychainsentinel.dto.DashboardSummaryDto;
 import com.supplychainsentinel.dto.DistributionEntry;
 import com.supplychainsentinel.dto.RecentApplicationDto;
+import com.supplychainsentinel.dto.RecentFindingDto;
 import com.supplychainsentinel.dto.RecentPipelineRunDto;
 import com.supplychainsentinel.entity.InventoryApplication;
 import com.supplychainsentinel.entity.PipelineRun;
+import com.supplychainsentinel.entity.SecurityFinding;
 import com.supplychainsentinel.repository.ApplicationRepository;
 import com.supplychainsentinel.repository.PipelineRunRepository;
+import com.supplychainsentinel.repository.SecurityFindingRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
@@ -27,13 +30,16 @@ public class DashboardService {
 
     private final ApplicationRepository applicationRepository;
     private final PipelineRunRepository pipelineRunRepository;
+    private final SecurityFindingRepository findingRepository;
 
     public DashboardService(
             ApplicationRepository applicationRepository,
-            PipelineRunRepository pipelineRunRepository
+            PipelineRunRepository pipelineRunRepository,
+            SecurityFindingRepository findingRepository
     ) {
         this.applicationRepository = applicationRepository;
         this.pipelineRunRepository = pipelineRunRepository;
+        this.findingRepository = findingRepository;
     }
 
     @Transactional(readOnly = true)
@@ -94,12 +100,38 @@ public class DashboardService {
                 ))
                 .toList();
 
+        // ── Security finding KPI counts ────────────────────────
+        long openFindings = findingRepository.countOpenFindings();
+        long criticalOpenFindings = findingRepository.countOpenCritical();
+        long highOpenFindings = findingRepository.countOpenHigh();
+        List<DistributionEntry> openBySeverity = findingRepository.openFindingsBySeverity();
+
+        // ── Recent findings (top 5 by lastSeen desc) ──────────
+        List<SecurityFinding> recentFindingsList = findingRepository
+                .findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "lastSeen")))
+                .getContent();
+
+        List<RecentFindingDto> recentFindingDtos = recentFindingsList.stream()
+                .map(f -> new RecentFindingDto(
+                        f.getId(),
+                        f.getApplication().getName(),
+                        f.getTitle(),
+                        f.getVulnerabilityId(),
+                        f.getSeverity(),
+                        f.getScanner(),
+                        f.getStatus(),
+                        f.getLastSeen()
+                ))
+                .toList();
+
         return new DashboardSummaryDto(
                 total, active, critical, highCriticality, internetFacing, highCriticalInternetFacing,
                 criticalityDist, lifecycleDist, hostingDist, businessUnitDist,
                 recentApps,
                 totalPipelineRuns, successfulPipelineRuns, failedPipelineRuns, successRate,
-                recentPipelineDtos
+                recentPipelineDtos,
+                openFindings, criticalOpenFindings, highOpenFindings,
+                openBySeverity, recentFindingDtos
         );
     }
 }

@@ -4,7 +4,7 @@ import ReactECharts from 'echarts-for-react'
 import PageHeader from '../components/PageHeader'
 import { getDashboardSummary } from '../api/dashboard'
 import { extractApiError } from '../api/client'
-import type { DashboardSummary, DistributionEntry } from '../types'
+import type { DashboardSummary, DistributionEntry, RecentFinding } from '../types'
 
 // ── KPI card ─────────────────────────────────────────────────
 
@@ -162,6 +162,15 @@ export default function Dashboard() {
             />
           </div>
 
+          {/* ── Security Findings KPIs ─────────────────────── */}
+          <p className="text-xs text-sentinel-500 uppercase tracking-widest mb-2">Security Findings</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <KpiCard label="Open Findings" value={data.openFindings} color="bg-red-500" />
+            <KpiCard label="Critical Open" value={data.criticalOpenFindings} color="bg-red-600" />
+            <KpiCard label="High Open" value={data.highOpenFindings} color="bg-accent-500" />
+            <KpiCard label="By Severity" value={data.openFindingsBySeverity.length} color="bg-sentinel-400" sub="distinct levels" />
+          </div>
+
           {/* ── Charts ───────────────────────────────────────── */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
             <ChartCard title="Criticality Distribution" option={pieOption(data.criticalityDistribution, CRIT_COLORS)} />
@@ -239,10 +248,47 @@ export default function Dashboard() {
             )}
           </div>
 
+          {/* ── Recent findings ──────────────────────────────── */}
+          <div className="card overflow-hidden mb-4">
+            <h3 className="text-sm font-medium text-sentinel-200 px-5 py-4 border-b border-sentinel-800">Recent Security Findings</h3>
+            {data.recentFindings.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sentinel-500">No security findings yet. Ingest scanner reports to populate findings.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-sentinel-850 border-b border-sentinel-800">
+                    <tr className="text-left text-sentinel-400">
+                      <th className="px-4 py-3 font-medium">Application</th>
+                      <th className="px-4 py-3 font-medium">Title</th>
+                      <th className="px-4 py-3 font-medium">CVE / Rule</th>
+                      <th className="px-4 py-3 font-medium">Severity</th>
+                      <th className="px-4 py-3 font-medium">Scanner</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Last Seen</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.recentFindings.map((f: RecentFinding) => (
+                      <tr key={f.id} className="border-b border-sentinel-800/50 hover:bg-sentinel-850/50 transition-colors">
+                        <td className="px-4 py-3 text-sentinel-100">{f.applicationName}</td>
+                        <td className="px-4 py-3 text-sentinel-200">{f.title}</td>
+                        <td className="px-4 py-3 text-sentinel-400 font-mono text-xs">{f.vulnerabilityId || '—'}</td>
+                        <td className="px-4 py-3"><CritBadge v={f.severity} /></td>
+                        <td className="px-4 py-3 text-sentinel-400 text-xs">{f.scanner}</td>
+                        <td className="px-4 py-3 text-sentinel-400 text-xs">{f.status}</td>
+                        <td className="px-4 py-3 text-sentinel-400 text-xs">{f.lastSeen ? new Date(f.lastSeen).toLocaleString() : '—'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           {/* ── Future capabilities note ──────────────────────── */}
           <div className="p-3 bg-sentinel-850 border border-sentinel-700 rounded-lg">
             <p className="text-xs text-sentinel-400">
-              Vulnerability, SBOM and release-risk metrics will be added in upcoming phases as those modules are implemented.
+              SBOM and release-risk metrics will be added in upcoming phases as those modules are implemented.
             </p>
           </div>
         </>

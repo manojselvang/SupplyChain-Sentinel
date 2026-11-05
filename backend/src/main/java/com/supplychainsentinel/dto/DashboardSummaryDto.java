@@ -35,5 +35,16 @@ public record DashboardSummaryDto(
         double pipelineSuccessRate,
 
         // ── Recent pipeline runs (top 5 by started_at desc) ─
-        List<RecentPipelineRunDto> recentPipelineRuns
+        List<RecentPipelineRunDto> recentPipelineRuns,
+
+        // ── Security finding KPI counts ──────────────────
+        long openFindings,
+        long criticalOpenFindings,
+        long highOpenFindings,
+
+        // ── Findings by severity (OPEN only) ─────────────
+        List<DistributionEntry> openFindingsBySeverity,
+
+        // ── Recent findings (top 5 by last_seen desc) ────
+        List<RecentFindingDto> recentFindings
 ) {}

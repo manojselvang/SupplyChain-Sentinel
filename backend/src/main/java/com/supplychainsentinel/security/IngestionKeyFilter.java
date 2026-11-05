@@ -19,13 +19,17 @@ import java.security.MessageDigest;
 
 /**
  * Validates the {@code X-CI-INGESTION-KEY} header for requests to
- * {@code /api/v1/integrations/**}.  Uses constant-time comparison to
- * prevent timing attacks.  Never logs the key value.
+ * {@code /api/v1/integrations/**}.
  *
- * <p>This filter runs <em>before</em> {@link JwtAuthenticationFilter} in the
- * Spring Security chain.  The ingestion routes are configured as
- * {@code permitAll()} in {@link SecurityConfig} — this filter is the
- * actual gatekeeper.</p>
+ * <p>Security properties:
+ * <ul>
+ *   <li>Uses constant-time comparison to prevent timing attacks.</li>
+ *   <li>Never logs the key value.</li>
+ *   <li>Requires a minimum configured key length of 32 bytes; a shorter or
+ *       absent key causes the server to respond 503 (misconfiguration) for
+ *       all ingestion paths — callers see a configuration failure, not 401.</li>
+ *   <li>An invalid client-supplied key returns 401.</li>
+ * </ul>
  */
 @Component
 public class IngestionKeyFilter extends OncePerRequestFilter {
@@ -33,6 +37,7 @@ public class IngestionKeyFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(IngestionKeyFilter.class);
     private static final String INGESTION_PATH = "/api/v1/integrations/";
     private static final String KEY_HEADER = "X-CI-INGESTION-KEY";
+    static final int MINIMUM_KEY_BYTES = 32;
 
     private final ObjectMapper objectMapper;
     private final String configuredKey;
@@ -43,6 +48,17 @@ public class IngestionKeyFilter extends OncePerRequestFilter {
     ) {
         this.objectMapper = objectMapper;
         this.configuredKey = configuredKey;
+
+        // Fail-fast validation on startup
+        if (configuredKey == null || configuredKey.isBlank()) {
+            log.warn("CI_INGESTION_API_KEY is not configured. " +
+                     "All ingestion endpoints will return 503 until a key of at least {} bytes is set.",
+                     MINIMUM_KEY_BYTES);
+        } else if (configuredKey.getBytes(StandardCharsets.UTF_8).length < MINIMUM_KEY_BYTES) {
+            log.warn("CI_INGESTION_API_KEY is configured but shorter than {} bytes. " +
+                     "All ingestion endpoints will return 503 until a stronger key is set.",
+                     MINIMUM_KEY_BYTES);
+        }
     }
 
     @Override
@@ -60,16 +76,20 @@ public class IngestionKeyFilter extends OncePerRequestFilter {
             return;
         }
 
-        String providedKey = request.getHeader(KEY_HEADER);
-
-        if (configuredKey == null || configuredKey.isBlank()) {
-            log.warn("CI ingestion key not configured — rejecting request to {}", path);
-            sendUnauthorized(response, request, "CI ingestion is not configured on this server");
+        // Server-side misconfiguration: key absent or too short → 503
+        if (configuredKey == null || configuredKey.isBlank() ||
+                configuredKey.getBytes(StandardCharsets.UTF_8).length < MINIMUM_KEY_BYTES) {
+            sendError(response, request, HttpServletResponse.SC_SERVICE_UNAVAILABLE,
+                    "Service Unavailable",
+                    "CI ingestion key is not configured or does not meet minimum strength requirements");
             return;
         }
 
+        String providedKey = request.getHeader(KEY_HEADER);
+
         if (providedKey == null || providedKey.isBlank()) {
-            sendUnauthorized(response, request, "Missing " + KEY_HEADER + " header");
+            sendError(response, request, HttpServletResponse.SC_UNAUTHORIZED,
+                    "Unauthorized", "Missing " + KEY_HEADER + " header");
             return;
         }
 
@@ -78,21 +98,24 @@ public class IngestionKeyFilter extends OncePerRequestFilter {
         byte[] configuredBytes = configuredKey.getBytes(StandardCharsets.UTF_8);
 
         if (!MessageDigest.isEqual(providedBytes, configuredBytes)) {
-            sendUnauthorized(response, request, "Invalid CI ingestion key");
+            sendError(response, request, HttpServletResponse.SC_UNAUTHORIZED,
+                    "Unauthorized", "Invalid CI ingestion key");
             return;
         }
 
         filterChain.doFilter(request, response);
     }
 
-    private void sendUnauthorized(
+    private void sendError(
             HttpServletResponse response,
             HttpServletRequest request,
+            int status,
+            String error,
             String message
     ) throws IOException {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setStatus(status);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-        ApiError body = new ApiError(401, "Unauthorized", message, request.getRequestURI());
+        ApiError body = new ApiError(status, error, message, request.getRequestURI());
         response.getWriter().write(objectMapper.writeValueAsString(body));
     }
 }
