@@ -8,6 +8,7 @@ import ApplicationDetail from './pages/ApplicationDetail'
 import Pipelines from './pages/Pipelines'
 import Findings from './pages/Findings'
 import Sbom from './pages/Sbom'
+import ArtifactVerifications from './pages/ArtifactVerifications'
 import Releases from './pages/Releases'
 import Policies from './pages/Policies'
 import Deployments from './pages/Deployments'
@@ -31,6 +32,7 @@ export default function App() {
         <Route path="pipelines" element={<Pipelines />} />
         <Route path="findings" element={<Findings />} />
         <Route path="sbom" element={<Sbom />} />
+        <Route path="artifact-verifications" element={<ArtifactVerifications />} />
         <Route path="releases" element={<Releases />} />
         <Route path="policies" element={<Policies />} />
         <Route path="deployments" element={<Deployments />} />

@@ -132,6 +132,12 @@ export interface DashboardSummary {
   highOpenFindings: number
   openFindingsBySeverity: DistributionEntry[]
   recentFindings: RecentFinding[]
+  totalSbomDocuments: number
+  totalSbomComponents: number
+  verifiedArtifacts: number
+  failedArtifactVerifications: number
+  recentSbomDocuments: RecentSbom[]
+  recentArtifactVerifications: RecentArtifactVerification[]
 }
 
 export interface DistributionEntry {
@@ -224,3 +230,80 @@ export interface RecentFinding {
 
 export const FINDING_SEVERITIES = ['CRITICAL', 'HIGH', 'MEDIUM', 'LOW', 'INFO', 'UNKNOWN'] as const
 export const FINDING_STATUSES = ['OPEN', 'ACKNOWLEDGED', 'REMEDIATED', 'ACCEPTED'] as const
+
+// ── SBOM Management ────────────────────────────────────────
+
+export interface SbomDocument {
+  id: string
+  applicationId: string
+  applicationName: string
+  pipelineRunId: string | null
+  artifactDigest: string | null
+  format: string
+  specVersion: string | null
+  serialNumber: string | null
+  documentVersion: number | null
+  documentSha256: string
+  componentCount: number
+  generatedAt: string | null
+  ingestedAt: string
+  createdAt: string
+}
+
+export interface SbomComponent {
+  id: string
+  bomRef: string | null
+  componentType: string | null
+  groupName: string | null
+  name: string
+  version: string | null
+  purl: string | null
+  cpe: string | null
+  scope: string | null
+  supplier: string | null
+  licenses: string | null
+  hashes: string | null
+  createdAt: string
+}
+
+export interface RecentSbom {
+  id: string
+  applicationName: string
+  specVersion: string | null
+  componentCount: number
+  artifactDigest: string | null
+  ingestedAt: string
+}
+
+// ── Artifact Integrity ─────────────────────────────────────
+
+export interface ArtifactVerification {
+  id: string
+  applicationId: string
+  applicationName: string
+  pipelineRunId: string | null
+  artifactReference: string
+  artifactDigest: string | null
+  verificationTool: string
+  verificationMode: string
+  verificationStatus: string
+  signerIdentity: string | null
+  oidcIssuer: string | null
+  publicKeyFingerprint: string | null
+  cosignVersion: string | null
+  verifiedAt: string | null
+  reportedAt: string
+  createdAt: string
+}
+
+export interface RecentArtifactVerification {
+  id: string
+  applicationName: string
+  artifactReference: string
+  verificationStatus: string
+  verificationMode: string
+  reportedAt: string
+}
+
+export const VERIFICATION_STATUSES = ['VERIFIED', 'FAILED', 'MISSING_SIGNATURE', 'ERROR'] as const
+export const VERIFICATION_MODES = ['KEY', 'KEYLESS'] as const

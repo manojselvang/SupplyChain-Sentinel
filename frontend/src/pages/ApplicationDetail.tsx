@@ -6,9 +6,11 @@ import ApplicationFormModal from './ApplicationFormModal'
 import { getApplication, deleteApplication } from '../api/applications'
 import { getApplicationPipelineRuns } from '../api/pipelineRuns'
 import { getApplicationSecurityFindings } from '../api/securityFindings'
+import { getApplicationSboms } from '../api/sboms'
+import { getApplicationArtifactVerifications } from '../api/artifactVerifications'
 import { extractApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import type { Application, PipelineRun, SecurityFinding, Page } from '../types'
+import type { Application, PipelineRun, SecurityFinding, SbomDocument, ArtifactVerification, Page } from '../types'
 
 // ── Detail field component ─────────────────────────────────
 
@@ -59,6 +61,14 @@ export default function ApplicationDetail() {
   const [findings, setFindings] = useState<Page<SecurityFinding> | null>(null)
   const [findingsLoading, setFindingsLoading] = useState(false)
 
+  // SBOM history state
+  const [sboms, setSboms] = useState<Page<SbomDocument> | null>(null)
+  const [sbomsLoading, setSbomsLoading] = useState(false)
+
+  // Artifact verification state
+  const [verifications, setVerifications] = useState<Page<ArtifactVerification> | null>(null)
+  const [verificationsLoading, setVerificationsLoading] = useState(false)
+
   const fetchApp = useCallback(async () => {
     if (!id) return
     setLoading(true)
@@ -99,11 +109,29 @@ export default function ApplicationDetail() {
     }
   }, [id])
 
+  const fetchSboms = useCallback(async () => {
+    if (!id) return
+    setSbomsLoading(true)
+    try { setSboms(await getApplicationSboms(id, 0, 5)) }
+    catch { }
+    finally { setSbomsLoading(false) }
+  }, [id])
+
+  const fetchVerifications = useCallback(async () => {
+    if (!id) return
+    setVerificationsLoading(true)
+    try { setVerifications(await getApplicationArtifactVerifications(id, 0, 5)) }
+    catch { }
+    finally { setVerificationsLoading(false) }
+  }, [id])
+
   useEffect(() => {
     fetchApp()
     fetchPipelineRuns()
     fetchFindings()
-  }, [fetchApp, fetchPipelineRuns, fetchFindings])
+    fetchSboms()
+    fetchVerifications()
+  }, [fetchApp, fetchPipelineRuns, fetchFindings, fetchSboms, fetchVerifications])
 
   const handleDelete = async () => {
     if (!app) return
@@ -321,6 +349,84 @@ export default function ApplicationDetail() {
                       <td className="px-4 py-3 text-sentinel-400">{f.affectedPackage || '—'}</td>
                       <td className="px-4 py-3"><span className={`badge ${statCls}`}>{f.status}</span></td>
                       <td className="px-4 py-3 text-sentinel-400 text-xs">{f.lastSeen ? new Date(f.lastSeen).toLocaleString() : '—'}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* SBOM history */}
+      <div className="card overflow-hidden mb-4">
+        <h3 className="text-sm font-medium text-sentinel-200 px-5 py-4 border-b border-sentinel-800">
+          SBOM Documents
+        </h3>
+        {sbomsLoading ? (
+          <div className="flex items-center justify-center py-8"><div className="w-6 h-6 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" /></div>
+        ) : !sboms || sboms.content.length === 0 ? (
+          <div className="px-5 py-8 text-center text-sentinel-500 text-sm">No SBOM documents yet.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-sentinel-850 border-b border-sentinel-800">
+                <tr className="text-left text-sentinel-400">
+                  <th className="px-4 py-3 font-medium">Version</th>
+                  <th className="px-4 py-3 font-medium">Components</th>
+                  <th className="px-4 py-3 font-medium">Artifact Digest</th>
+                  <th className="px-4 py-3 font-medium">Ingested</th>
+                </tr>
+              </thead>
+              <tbody>
+                {sboms.content.map(s => (
+                  <tr key={s.id} className="border-b border-sentinel-800/50 hover:bg-sentinel-850/50">
+                    <td className="px-4 py-3"><span className="badge badge-info">{s.specVersion || '—'}</span></td>
+                    <td className="px-4 py-3 text-accent-400 font-semibold">{s.componentCount}</td>
+                    <td className="px-4 py-3 text-sentinel-400 font-mono text-xs">{s.artifactDigest ? s.artifactDigest.substring(0, 12) + '…' : '—'}</td>
+                    <td className="px-4 py-3 text-sentinel-400 text-xs">{new Date(s.ingestedAt).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Artifact verification history */}
+      <div className="card overflow-hidden mb-4">
+        <div className="px-5 py-4 border-b border-sentinel-800">
+          <h3 className="text-sm font-medium text-sentinel-200">Artifact Integrity</h3>
+          <p className="text-xs text-sentinel-500 mt-0.5">CI-reported Cosign verification results</p>
+        </div>
+        {verificationsLoading ? (
+          <div className="flex items-center justify-center py-8"><div className="w-6 h-6 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" /></div>
+        ) : !verifications || verifications.content.length === 0 ? (
+          <div className="px-5 py-8 text-center text-sentinel-500 text-sm">No verification records yet.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-sentinel-850 border-b border-sentinel-800">
+                <tr className="text-left text-sentinel-400">
+                  <th className="px-4 py-3 font-medium">Status</th>
+                  <th className="px-4 py-3 font-medium">Mode</th>
+                  <th className="px-4 py-3 font-medium">Artifact</th>
+                  <th className="px-4 py-3 font-medium">Signer</th>
+                  <th className="px-4 py-3 font-medium">Reported</th>
+                </tr>
+              </thead>
+              <tbody>
+                {verifications.content.map(v => {
+                  const sCls = v.verificationStatus === 'VERIFIED' ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                    : v.verificationStatus === 'FAILED' ? 'bg-red-500/15 text-red-400 border border-red-500/30'
+                    : 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                  return (
+                    <tr key={v.id} className="border-b border-sentinel-800/50 hover:bg-sentinel-850/50">
+                      <td className="px-4 py-3"><span className={`badge ${sCls}`}>{v.verificationStatus.replace('_', ' ')}</span></td>
+                      <td className="px-4 py-3"><span className="badge badge-info">{v.verificationMode}</span></td>
+                      <td className="px-4 py-3 text-sentinel-400 font-mono text-xs">{v.artifactReference ? v.artifactReference.substring(v.artifactReference.lastIndexOf('@'), v.artifactReference.lastIndexOf('@') + 14) + '…' : '—'}</td>
+                      <td className="px-4 py-3 text-sentinel-400 text-xs">{v.signerIdentity ? v.signerIdentity.substring(0, 30) + (v.signerIdentity.length > 30 ? '…' : '') : v.publicKeyFingerprint ? v.publicKeyFingerprint.substring(0, 12) + '…' : '—'}</td>
+                      <td className="px-4 py-3 text-sentinel-400 text-xs">{new Date(v.reportedAt).toLocaleString()}</td>
                     </tr>
                   )
                 })}

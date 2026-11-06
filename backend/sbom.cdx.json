@@ -1,0 +1,113 @@
+{
+  "bomFormat": "CycloneDX",
+  "components": [
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/flyway-core@1.0.0",
+      "type": "library",
+      "name": "flyway-core"
+    },
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/flyway-database-postgresql@1.0.0",
+      "type": "library",
+      "name": "flyway-database-postgresql"
+    },
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/jjwt-api@1.0.0",
+      "type": "library",
+      "name": "jjwt-api"
+    },
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/jjwt-impl@1.0.0",
+      "type": "library",
+      "name": "jjwt-impl"
+    },
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/jjwt-jackson@1.0.0",
+      "type": "library",
+      "name": "jjwt-jackson"
+    },
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/postgresql@1.0.0",
+      "type": "library",
+      "name": "postgresql"
+    },
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/spring-boot-maven-plugin@1.0.0",
+      "type": "library",
+      "name": "spring-boot-maven-plugin"
+    },
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/spring-boot-starter-actuator@1.0.0",
+      "type": "library",
+      "name": "spring-boot-starter-actuator"
+    },
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/spring-boot-starter-data-jpa@1.0.0",
+      "type": "library",
+      "name": "spring-boot-starter-data-jpa"
+    },
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/spring-boot-starter-parent@1.0.0",
+      "type": "library",
+      "name": "spring-boot-starter-parent"
+    },
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/spring-boot-starter-security@1.0.0",
+      "type": "library",
+      "name": "spring-boot-starter-security"
+    },
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/spring-boot-starter-test@1.0.0",
+      "type": "library",
+      "name": "spring-boot-starter-test"
+    },
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/spring-boot-starter-validation@1.0.0",
+      "type": "library",
+      "name": "spring-boot-starter-validation"
+    },
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/spring-boot-starter-web@1.0.0",
+      "type": "library",
+      "name": "spring-boot-starter-web"
+    },
+    {
+      "version": "1.0.0",
+      "purl": "pkg:maven/com.supplychainsentinel/springdoc-openapi-starter-webmvc-ui@1.0.0",
+      "type": "library",
+      "name": "springdoc-openapi-starter-webmvc-ui"
+    }
+  ],
+  "version": 1,
+  "serialNumber": "urn:uuid:603028c8-fdf6-49ec-b3ef-117808535406",
+  "metadata": {
+    "timestamp": "2026-11-06T18.47.44Z",
+    "component": {
+      "version": "0.1.0",
+      "type": "application",
+      "name": "supplychain-sentinel-backend"
+    },
+    "tools": [
+      {
+        "version": "1.0",
+        "vendor": "manual",
+        "name": "pom-parser"
+      }
+    ]
+  },
+  "specVersion": "1.7"
+}
