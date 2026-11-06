@@ -36,6 +36,7 @@ public class SecurityFindingService {
 
     private final SecurityFindingRepository findingRepository;
     private final SecurityScanRepository scanRepository;
+    private final SecurityScanFindingRepository scanFindingRepository;
     private final ApplicationRepository applicationRepository;
     private final PipelineRunRepository pipelineRunRepository;
     private final Map<String, ScannerParser> parsers;
@@ -43,12 +44,14 @@ public class SecurityFindingService {
     public SecurityFindingService(
             SecurityFindingRepository findingRepository,
             SecurityScanRepository scanRepository,
+            SecurityScanFindingRepository scanFindingRepository,
             ApplicationRepository applicationRepository,
             PipelineRunRepository pipelineRunRepository,
             List<ScannerParser> parserList
     ) {
         this.findingRepository = findingRepository;
         this.scanRepository = scanRepository;
+        this.scanFindingRepository = scanFindingRepository;
         this.applicationRepository = applicationRepository;
         this.pipelineRunRepository = pipelineRunRepository;
         this.parsers = new HashMap<>();
@@ -142,6 +145,16 @@ public class SecurityFindingService {
                 newCount++;
             }
             findingRepository.save(finding);
+
+            // Create scan-to-finding junction record for historical traceability.
+            // This links every processed finding (new or deduplicated) to its scan.
+            if (!scanFindingRepository.existsByScanIdAndFindingId(scan.getId(), finding.getId())) {
+                SecurityScanFinding junction = new SecurityScanFinding();
+                junction.setScanId(scan.getId());
+                junction.setFindingId(finding.getId());
+                scanFindingRepository.save(junction);
+            }
+
             responses.add(SecurityFindingMapper.toDto(finding));
         }
         findingRepository.flush();
