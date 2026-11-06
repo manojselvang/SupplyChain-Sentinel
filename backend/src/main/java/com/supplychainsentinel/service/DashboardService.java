@@ -3,13 +3,19 @@ package com.supplychainsentinel.service;
 import com.supplychainsentinel.dto.DashboardSummaryDto;
 import com.supplychainsentinel.dto.DistributionEntry;
 import com.supplychainsentinel.dto.RecentApplicationDto;
+import com.supplychainsentinel.dto.RecentArtifactVerificationDto;
 import com.supplychainsentinel.dto.RecentFindingDto;
 import com.supplychainsentinel.dto.RecentPipelineRunDto;
+import com.supplychainsentinel.dto.RecentSbomDto;
+import com.supplychainsentinel.entity.ArtifactVerification;
 import com.supplychainsentinel.entity.InventoryApplication;
 import com.supplychainsentinel.entity.PipelineRun;
+import com.supplychainsentinel.entity.SbomDocument;
 import com.supplychainsentinel.entity.SecurityFinding;
 import com.supplychainsentinel.repository.ApplicationRepository;
+import com.supplychainsentinel.repository.ArtifactVerificationRepository;
 import com.supplychainsentinel.repository.PipelineRunRepository;
+import com.supplychainsentinel.repository.SbomDocumentRepository;
 import com.supplychainsentinel.repository.SecurityFindingRepository;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
@@ -31,15 +37,21 @@ public class DashboardService {
     private final ApplicationRepository applicationRepository;
     private final PipelineRunRepository pipelineRunRepository;
     private final SecurityFindingRepository findingRepository;
+    private final SbomDocumentRepository sbomDocRepository;
+    private final ArtifactVerificationRepository verificationRepository;
 
     public DashboardService(
             ApplicationRepository applicationRepository,
             PipelineRunRepository pipelineRunRepository,
-            SecurityFindingRepository findingRepository
+            SecurityFindingRepository findingRepository,
+            SbomDocumentRepository sbomDocRepository,
+            ArtifactVerificationRepository verificationRepository
     ) {
         this.applicationRepository = applicationRepository;
         this.pipelineRunRepository = pipelineRunRepository;
         this.findingRepository = findingRepository;
+        this.sbomDocRepository = sbomDocRepository;
+        this.verificationRepository = verificationRepository;
     }
 
     @Transactional(readOnly = true)
@@ -124,6 +136,44 @@ public class DashboardService {
                 ))
                 .toList();
 
+        // ── SBOM KPI counts ────────────────────────────────────
+        long totalSbomDocuments = sbomDocRepository.count();
+        long totalSbomComponents = sbomDocRepository.sumAllComponents();
+        long verifiedArtifacts = verificationRepository.countVerified();
+        long failedVerifications = verificationRepository.countFailed();
+
+        // ── Recent SBOM documents (top 5 by createdAt desc) ────
+        List<SbomDocument> recentSboms = sbomDocRepository
+                .findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")))
+                .getContent();
+
+        List<RecentSbomDto> recentSbomDtos = recentSboms.stream()
+                .map(s -> new RecentSbomDto(
+                        s.getId(),
+                        s.getApplication().getName(),
+                        s.getSpecVersion(),
+                        s.getComponentCount(),
+                        s.getArtifactDigest(),
+                        s.getIngestedAt()
+                ))
+                .toList();
+
+        // ── Recent artifact verifications (top 5 by createdAt desc) ─
+        List<ArtifactVerification> recentVerifications = verificationRepository
+                .findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "createdAt")))
+                .getContent();
+
+        List<RecentArtifactVerificationDto> recentVerificationDtos = recentVerifications.stream()
+                .map(av -> new RecentArtifactVerificationDto(
+                        av.getId(),
+                        av.getApplication().getName(),
+                        av.getArtifactReference(),
+                        av.getVerificationStatus(),
+                        av.getVerificationMode(),
+                        av.getReportedAt()
+                ))
+                .toList();
+
         return new DashboardSummaryDto(
                 total, active, critical, highCriticality, internetFacing, highCriticalInternetFacing,
                 criticalityDist, lifecycleDist, hostingDist, businessUnitDist,
@@ -131,7 +181,9 @@ public class DashboardService {
                 totalPipelineRuns, successfulPipelineRuns, failedPipelineRuns, successRate,
                 recentPipelineDtos,
                 openFindings, criticalOpenFindings, highOpenFindings,
-                openBySeverity, recentFindingDtos
+                openBySeverity, recentFindingDtos,
+                totalSbomDocuments, totalSbomComponents, verifiedArtifacts, failedVerifications,
+                recentSbomDtos, recentVerificationDtos
         );
     }
 }

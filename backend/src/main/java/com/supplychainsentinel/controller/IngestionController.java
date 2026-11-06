@@ -1,11 +1,7 @@
 package com.supplychainsentinel.controller;
 
-import com.supplychainsentinel.dto.PipelineRunIngestionRequest;
-import com.supplychainsentinel.dto.PipelineRunResponse;
-import com.supplychainsentinel.dto.SecurityScanIngestionRequest;
-import com.supplychainsentinel.dto.SecurityScanResponse;
-import com.supplychainsentinel.service.PipelineRunService;
-import com.supplychainsentinel.service.SecurityFindingService;
+import com.supplychainsentinel.dto.*;
+import com.supplychainsentinel.service.*;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -19,18 +15,24 @@ import org.springframework.web.bind.annotation.*;
  */
 @RestController
 @RequestMapping("/api/v1/integrations")
-@Tag(name = "CI/CD Ingestion", description = "Pipeline run and security scan ingestion")
+@Tag(name = "CI/CD Ingestion", description = "Pipeline run, security scan, SBOM and artifact verification ingestion")
 public class IngestionController {
 
     private final PipelineRunService pipelineRunService;
     private final SecurityFindingService securityFindingService;
+    private final SbomService sbomService;
+    private final ArtifactVerificationService artifactVerificationService;
 
     public IngestionController(
             PipelineRunService pipelineRunService,
-            SecurityFindingService securityFindingService
+            SecurityFindingService securityFindingService,
+            SbomService sbomService,
+            ArtifactVerificationService artifactVerificationService
     ) {
         this.pipelineRunService = pipelineRunService;
         this.securityFindingService = securityFindingService;
+        this.sbomService = sbomService;
+        this.artifactVerificationService = artifactVerificationService;
     }
 
     @PostMapping("/pipeline-runs")
@@ -49,6 +51,25 @@ public class IngestionController {
             @Valid @RequestBody SecurityScanIngestionRequest request
     ) {
         SecurityScanResponse result = securityFindingService.ingestScan(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(result);
+    }
+
+    @PostMapping("/sboms")
+    @Operation(summary = "Submit CycloneDX SBOM document (API key auth)")
+    public ResponseEntity<SbomIngestionResponse> ingestSbom(
+            @Valid @RequestBody SbomIngestionRequest request
+    ) {
+        SbomIngestionResponse result = sbomService.ingestSbom(request);
+        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
+                .body(result);
+    }
+
+    @PostMapping("/artifact-verifications")
+    @Operation(summary = "Submit CI-reported Cosign verification result (API key auth)")
+    public ResponseEntity<ArtifactVerificationResponse> ingestVerification(
+            @Valid @RequestBody ArtifactVerificationIngestionRequest request
+    ) {
+        ArtifactVerificationResponse result = artifactVerificationService.ingestVerification(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
     }
 }

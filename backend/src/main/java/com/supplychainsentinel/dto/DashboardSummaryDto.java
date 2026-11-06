@@ -46,5 +46,17 @@ public record DashboardSummaryDto(
         List<DistributionEntry> openFindingsBySeverity,
 
         // ── Recent findings (top 5 by last_seen desc) ────
-        List<RecentFindingDto> recentFindings
+        List<RecentFindingDto> recentFindings,
+
+        // ── SBOM KPI counts ──────────────────────────────
+        long totalSbomDocuments,
+        long totalSbomComponents,
+        long verifiedArtifacts,
+        long failedArtifactVerifications,
+
+        // ── Recent SBOM documents (top 5 by created_at desc) ──
+        List<RecentSbomDto> recentSbomDocuments,
+
+        // ── Recent verifications (top 5 by created_at desc) ─
+        List<RecentArtifactVerificationDto> recentArtifactVerifications
 ) {}
