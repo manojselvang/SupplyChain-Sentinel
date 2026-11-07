@@ -1,204 +1,145 @@
 # GitHub Actions Integration
 
-This guide shows how to submit build metadata from GitHub Actions to SupplyChain Sentinel.
+Complete CI/CD pipeline integration with SupplyChain Sentinel — pipeline runs, security scans, SBOM, Cosign verification, and release gate evaluation.
 
 ## Prerequisites
 
-- SupplyChain Sentinel backend running and accessible from GitHub Actions runners
-- An `applicationKey` matching a registered application in the inventory
-- A GitHub Secret storing the ingestion API key
+- SupplyChain Sentinel backend running
+- Repository secrets: `SCS_INGESTION_KEY`, `SCS_URL` (variable)
+- Syft, Trivy, and Cosign available on runners
 
-## API contract
+## Complete Workflow
 
-**Endpoint:** `POST /api/v1/integrations/pipeline-runs`  
-**Auth header:** `X-CI-INGESTION-KEY: <key>`  
-**Content-Type:** `application/json`
-
-The same endpoint is used by GitHub Actions and Jenkins — there is no separate backend per provider.
-
-## GitHub Secret setup
-
-1. In your repository → **Settings → Secrets and variables → Actions**
-2. Click **New repository secret**
-3. Set **Name** to `SCS_INGESTION_KEY`
-4. Paste the value of `CI_INGESTION_API_KEY` from the backend configuration
-
-## Reusable workflow
-
-`.github/workflows/sentinel-notify.yml`
+`.github/workflows/ci-release.yml`
 
 ```yaml
-name: SupplyChain Sentinel — Notify
-
-on:
-  workflow_call:
-    inputs:
-      scs_url:
-        required: true
-        type: string
-      application_key:
-        required: true
-        type: string
-      status:
-        required: true
-        type: string         # RUNNING | SUCCESS | FAILED | CANCELLED
-      started_at:
-        required: false
-        type: string
-      completed_at:
-        required: false
-        type: string
-      artifact_path:
-        required: false
-        type: string
-    secrets:
-      scs_ingestion_key:
-        required: true
-
-jobs:
-  notify:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Calculate artifact digest
-        id: digest
-        if: inputs.artifact_path != ''
-        run: |
-          if [ -f "${{ inputs.artifact_path }}" ]; then
-            SHA=$(sha256sum "${{ inputs.artifact_path }}" | awk '{print $1}')
-            echo "value=$SHA" >> "$GITHUB_OUTPUT"
-          fi
-
-      - name: Submit pipeline run to SupplyChain Sentinel
-        env:
-          SCS_KEY: ${{ secrets.scs_ingestion_key }}
-        run: |
-          ARTIFACT_DIGEST="${{ steps.digest.outputs.value }}"
-          ARTIFACT_NAME=$(basename "${{ inputs.artifact_path }}" 2>/dev/null || echo "")
-
-          COMPLETED="${{ inputs.completed_at }}"
-          [ -z "$COMPLETED" ] && COMPLETED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-          STARTED="${{ inputs.started_at }}"
-          [ -z "$STARTED" ] && STARTED=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-
-          jq -n \
-            --arg appKey     "${{ inputs.application_key }}" \
-            --arg repo       "https://github.com/${{ github.repository }}" \
-            --arg branch     "${{ github.ref_name }}" \
-            --arg sha        "${{ github.sha }}" \
-            --arg runId      "${{ github.run_id }}" \
-            --arg runNum     "${{ github.run_number }}" \
-            --arg workflow   "${{ github.workflow }}" \
-            --arg trigger    "${{ github.event_name }}" \
-            --arg status     "${{ inputs.status }}" \
-            --arg startedAt  "$STARTED" \
-            --arg completedAt "$COMPLETED" \
-            --arg artName    "$ARTIFACT_NAME" \
-            --arg artDigest  "$ARTIFACT_DIGEST" \
-            '{
-              applicationKey: $appKey,
-              provider:        "GITHUB_ACTIONS",
-              externalRunId:   $runId,
-              workflowName:    $workflow,
-              repositoryUrl:   $repo,
-              branchName:      $branch,
-              commitSha:       $sha,
-              runNumber:       $runNum,
-              triggerEvent:    $trigger,
-              status:          $status,
-              startedAt:       $startedAt,
-              completedAt:     ($status == "RUNNING" | not | if . then $completedAt else null end),
-              artifactName:    (if $artName != "" then $artName else null end),
-              artifactDigest:  (if $artDigest != "" then $artDigest else null end)
-            }' > payload.json
-
-          # Never print the key — use --silent and check exit code separately
-          HTTP_CODE=$(curl -s -o response.json -w "%{http_code}" \
-            -X POST "${{ inputs.scs_url }}/api/v1/integrations/pipeline-runs" \
-            -H 'Content-Type: application/json' \
-            -H "X-CI-INGESTION-KEY: ${SCS_KEY}" \
-            -d @payload.json)
-
-          echo "SupplyChain Sentinel response: HTTP $HTTP_CODE"
-          if [ "$HTTP_CODE" -ge 400 ]; then
-            cat response.json
-          fi
-```
-
-## Main workflow using the reusable workflow
-
-`.github/workflows/ci.yml`
-
-```yaml
-name: CI
+name: CI + Release Gate
 
 on:
   push:
-    branches: [main, develop]
-  pull_request:
+    branches: [main]
 
 jobs:
-  build:
+  build-and-gate:
     runs-on: ubuntu-latest
-    outputs:
-      started_at: ${{ steps.time.outputs.started_at }}
-
     steps:
-      - name: Record start time
-        id: time
-        run: echo "started_at=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> "$GITHUB_OUTPUT"
-
       - uses: actions/checkout@v4
 
-      - name: Notify SCS — RUNNING
-        uses: ./.github/workflows/sentinel-notify.yml
-        with:
-          scs_url:         ${{ vars.SCS_URL }}
-          application_key: my-application
-          status:          RUNNING
-          started_at:      ${{ steps.time.outputs.started_at }}
-        secrets:
-          scs_ingestion_key: ${{ secrets.SCS_INGESTION_KEY }}
-
-      - name: Build
-        run: mvn clean package -DskipTests -B
-
-      - name: Test
-        run: mvn test -B
-
-  notify-result:
-    needs: build
-    runs-on: ubuntu-latest
-    if: always()
-
-    steps:
-      - name: Determine status
-        id: status
+      - name: Build and Test
         run: |
-          if [ "${{ needs.build.result }}" = "success" ]; then
-            echo "value=SUCCESS" >> "$GITHUB_OUTPUT"
-          elif [ "${{ needs.build.result }}" = "cancelled" ]; then
-            echo "value=CANCELLED" >> "$GITHUB_OUTPUT"
+          mvn clean package -DskipTests -B
+          mvn test -B
+
+      - name: Run Trivy Scan
+        run: trivy fs --scanners vuln --format json --output trivy-report.json ./backend
+
+      - name: Generate SBOM
+        run: syft scan dir:./backend -o cyclonedx-json@1.7=sbom.cdx.json
+
+      - name: Build and Push Image
+        id: build
+        run: |
+          docker build -t ghcr.io/${{ github.repository }}:latest .
+          docker push ghcr.io/${{ github.repository }}:latest
+          DIGEST=$(docker inspect --format='{{index .RepoDigests 0}}' ghcr.io/${{ github.repository }}:latest | grep -oP 'sha256:\K.*')
+          echo "digest=$DIGEST" >> "$GITHUB_OUTPUT"
+
+      - name: Cosign Verification
+        env:
+          SCS_KEY: ${{ secrets.SCS_INGESTION_KEY }}
+        run: |
+          REF="ghcr.io/${{ github.repository }}@sha256:${{ steps.build.outputs.digest }}"
+          COSIGN_VER=$(cosign version | head -1 | awk '{print $NF}')
+          NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+
+          if cosign verify "$REF" \
+            --certificate-identity "https://github.com/${{ github.repository }}/.github/workflows/ci-release.yml@refs/heads/main" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com"; then
+            STATUS="VERIFIED"
           else
-            echo "value=FAILED" >> "$GITHUB_OUTPUT"
+            STATUS="FAILED"
           fi
 
-      - name: Notify SCS — final result
-        uses: ./.github/workflows/sentinel-notify.yml
-        with:
-          scs_url:         ${{ vars.SCS_URL }}
-          application_key: my-application
-          status:          ${{ steps.status.outputs.value }}
-          started_at:      ${{ needs.build.outputs.started_at }}
-          completed_at:    $(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          artifact_path:   target/app.jar
-        secrets:
-          scs_ingestion_key: ${{ secrets.SCS_INGESTION_KEY }}
+          jq -n \
+            --arg appKey "${{ vars.SCS_APP_KEY }}" \
+            --arg ref "$REF" \
+            --arg digest "${{ steps.build.outputs.digest }}" \
+            --arg cosign "$COSIGN_VER" \
+            --arg ts "$NOW" \
+            --arg status "$STATUS" \
+            --arg signer "https://github.com/${{ github.repository }}/.github/workflows/ci-release.yml@refs/heads/main" \
+            --arg issuer "https://token.actions.githubusercontent.com" \
+            '{applicationKey:$appKey, artifactReference:$ref, artifactDigest:$digest,
+              verificationMode:"KEYLESS", verificationStatus:$status,
+              signerIdentity:$signer, oidcIssuer:$issuer,
+              cosignVersion:$cosign, verifiedAt:$ts, reportedAt:$ts}' \
+          | curl -sf -X POST "${{ vars.SCS_URL }}/api/v1/integrations/artifact-verifications" \
+            -H 'Content-Type: application/json' \
+            -H "X-CI-INGESTION-KEY: ${SCS_KEY}" \
+            -d @-
+
+      - name: Submit Trivy Report
+        env:
+          SCS_KEY: ${{ secrets.SCS_INGESTION_KEY }}
+        run: |
+          jq -n --arg appKey "${{ vars.SCS_APP_KEY }}" \
+            --slurpfile report trivy-report.json \
+            '{applicationKey:$appKey, scanner:"trivy", reportFormat:"TRIVY_JSON", scanTimestamp:"$(date -u +%Y-%m-%dT%H:%M:%SZ)", report:$report[0]}' \
+          | curl -sf -X POST "${{ vars.SCS_URL }}/api/v1/integrations/security-scans" \
+            -H 'Content-Type: application/json' \
+            -H "X-CI-INGESTION-KEY: ${SCS_KEY}" \
+            -d @-
+
+      - name: Submit SBOM
+        env:
+          SCS_KEY: ${{ secrets.SCS_INGESTION_KEY }}
+        run: |
+          jq -n --arg appKey "${{ vars.SCS_APP_KEY }}" \
+            --arg digest "${{ steps.build.outputs.digest }}" \
+            --slurpfile sbom sbom.cdx.json \
+            '{applicationKey:$appKey, artifactDigest:$digest, sbom:$sbom[0]}' \
+          | curl -sf -X POST "${{ vars.SCS_URL }}/api/v1/integrations/sboms" \
+            -H 'Content-Type: application/json' \
+            -H "X-CI-INGESTION-KEY: ${SCS_KEY}" \
+            -d @-
+
+      - name: Notify Pipeline — SUCCESS
+        env:
+          SCS_KEY: ${{ secrets.SCS_INGESTION_KEY }}
+        run: |
+          curl -sf -X POST "${{ vars.SCS_URL }}/api/v1/integrations/pipeline-runs" \
+            -H 'Content-Type: application/json' \
+            -H "X-CI-INGESTION-KEY: ${SCS_KEY}" \
+            -d "{\"applicationKey\":\"${{ vars.SCS_APP_KEY }}\",\"provider\":\"GITHUB_ACTIONS\",\"externalRunId\":\"${{ github.run_id }}\",\"workflowName\":\"CI\",\"repositoryUrl\":\"https://github.com/${{ github.repository }}\",\"branchName\":\"main\",\"commitSha\":\"${{ github.sha }}\",\"status\":\"SUCCESS\",\"startedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"completedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",\"artifactDigest\":\"${{ steps.build.outputs.digest }}\"}"
+
+      - name: Evaluate Release Gate
+        env:
+          SCS_KEY: ${{ secrets.SCS_INGESTION_KEY }}
+        run: |
+          GATE=$(curl -sf -X POST "${{ vars.SCS_URL }}/api/v1/integrations/release-gates/evaluate" \
+            -H 'Content-Type: application/json' \
+            -H "X-CI-INGESTION-KEY: ${SCS_KEY}" \
+            -d "{\"applicationKey\":\"${{ vars.SCS_APP_KEY }}\",\"pipelineRunId\":\"${{ github.run_id }}\"}")
+
+          DECISION=$(echo "$GATE" | jq -r '.decision')
+          echo "Release gate: $DECISION"
+          echo "$GATE" | jq '.'
+
+          if [ "$DECISION" = "BLOCK" ]; then
+            echo "::error::Release gate BLOCKED — security requirements not met"
+            exit 1
+          fi
+          echo "Release gate $DECISION — continuing"
 ```
 
-## Notes
+## CI Status Design
 
-- `externalRunId` uses `github.run_id`, which is globally unique per repository. This enables idempotent ingestion — the RUNNING and final-result calls update the same record.
-- The secret is never interpolated into a shell string that gets echoed or printed. `curl` receives it via the `-H` flag from the environment variable.
-- `jq` is pre-installed on GitHub-hosted runners. For self-hosted runners, install it or replace with a Python/node script.
-- Set `SCS_URL` as a repository **variable** (not a secret) since it contains no sensitive data.
+The `pipeline_runs.status = SUCCESS` stage submits after build, tests, Trivy, SBOM, and Cosign verification are all complete. The release gate evaluation reads the accumulated evidence and makes an independent decision.
+
+## Release Gate Handling
+
+| Decision | GitHub Actions Behavior |
+|----------|------------------------|
+| PASS | Continue to deployment |
+| WARN | Require documented manual approval (environment protection rule) |
+| BLOCK | Fail the workflow step — do not deploy |

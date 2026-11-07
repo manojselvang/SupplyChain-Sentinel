@@ -58,5 +58,16 @@ public record DashboardSummaryDto(
         List<RecentSbomDto> recentSbomDocuments,
 
         // ── Recent verifications (top 5 by created_at desc) ─
-        List<RecentArtifactVerificationDto> recentArtifactVerifications
+        List<RecentArtifactVerificationDto> recentArtifactVerifications,
+
+        // ── Release assessment KPI counts ────────────────
+        long totalReleaseAssessments,
+        long passAssessments,
+        long warnAssessments,
+        long blockAssessments,
+        long approvedReleases,
+        long pendingApprovals,
+
+        // ── Recent assessments (top 5 by assessed_at desc) ─
+        List<RecentReleaseAssessmentDto> recentReleaseAssessments
 ) {}

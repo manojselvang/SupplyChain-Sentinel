@@ -22,17 +22,20 @@ public class IngestionController {
     private final SecurityFindingService securityFindingService;
     private final SbomService sbomService;
     private final ArtifactVerificationService artifactVerificationService;
+    private final ReleaseAssessmentService releaseAssessmentService;
 
     public IngestionController(
             PipelineRunService pipelineRunService,
             SecurityFindingService securityFindingService,
             SbomService sbomService,
-            ArtifactVerificationService artifactVerificationService
+            ArtifactVerificationService artifactVerificationService,
+            ReleaseAssessmentService releaseAssessmentService
     ) {
         this.pipelineRunService = pipelineRunService;
         this.securityFindingService = securityFindingService;
         this.sbomService = sbomService;
         this.artifactVerificationService = artifactVerificationService;
+        this.releaseAssessmentService = releaseAssessmentService;
     }
 
     @PostMapping("/pipeline-runs")
@@ -71,5 +74,15 @@ public class IngestionController {
     ) {
         ArtifactVerificationResponse result = artifactVerificationService.ingestVerification(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(result);
+    }
+
+    @PostMapping("/release-gates/evaluate")
+    @Operation(summary = "Evaluate CI release gate using deterministic risk scoring (API key auth)")
+    public ResponseEntity<CiReleaseGateResponse> evaluateReleaseGate(
+            @Valid @RequestBody CiReleaseGateRequest request
+    ) {
+        CiReleaseGateResponse result = releaseAssessmentService.evaluateReleaseGate(
+                request.applicationKey(), java.util.UUID.fromString(request.pipelineRunId()));
+        return ResponseEntity.ok(result);
     }
 }

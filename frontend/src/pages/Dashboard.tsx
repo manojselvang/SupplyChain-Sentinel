@@ -4,7 +4,7 @@ import ReactECharts from 'echarts-for-react'
 import PageHeader from '../components/PageHeader'
 import { getDashboardSummary } from '../api/dashboard'
 import { extractApiError } from '../api/client'
-import type { DashboardSummary, DistributionEntry, RecentFinding, RecentSbom, RecentArtifactVerification } from '../types'
+import type { DashboardSummary, DistributionEntry, RecentFinding, RecentSbom, RecentArtifactVerification, RecentReleaseAssessment } from '../types'
 
 // ── KPI card ─────────────────────────────────────────────────
 
@@ -366,10 +366,57 @@ export default function Dashboard() {
             )}
           </div>
 
+          {/* ── Release Assurance KPIs ───────────────────────── */}
+          <p className="text-xs text-sentinel-500 uppercase tracking-widest mb-2">Release Assurance</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <KpiCard label="Total Assessments" value={data.totalReleaseAssessments} color="bg-blue-400" />
+            <KpiCard label="PASS" value={data.passAssessments} color="bg-green-500" />
+            <KpiCard label="WARN" value={data.warnAssessments} color="bg-amber-500" />
+            <KpiCard label="BLOCK" value={data.blockAssessments} color="bg-red-500" />
+          </div>
+
+          {/* ── Recent release assessments ────────────────────── */}
+          <div className="card overflow-hidden mb-4">
+            <h3 className="text-sm font-medium text-sentinel-200 px-5 py-4 border-b border-sentinel-800">Recent Release Assessments</h3>
+            {data.recentReleaseAssessments.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sentinel-500">No release assessments yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-sentinel-850 border-b border-sentinel-800">
+                    <tr className="text-left text-sentinel-400">
+                      <th className="px-4 py-3 font-medium">Application</th>
+                      <th className="px-4 py-3 font-medium">Score</th>
+                      <th className="px-4 py-3 font-medium">Decision</th>
+                      <th className="px-4 py-3 font-medium">Status</th>
+                      <th className="px-4 py-3 font-medium">Assessed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.recentReleaseAssessments.map((a: RecentReleaseAssessment) => {
+                      const dc = a.decision === 'PASS' ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                        : a.decision === 'WARN' ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30'
+                        : 'bg-red-500/15 text-red-400 border border-red-500/30'
+                      return (
+                        <tr key={a.id} className="border-b border-sentinel-800/50 hover:bg-sentinel-850/50 cursor-pointer" onClick={() => navigate(`/releases/${a.id}`)}>
+                          <td className="px-4 py-3 text-sentinel-100">{a.applicationName}</td>
+                          <td className="px-4 py-3 font-bold text-sentinel-200">{a.riskScore}</td>
+                          <td className="px-4 py-3"><span className={`badge ${dc} font-semibold`}>{a.decision}</span></td>
+                          <td className="px-4 py-3 text-sentinel-400 text-xs">{a.assessmentStatus.replace('_', ' ')}</td>
+                          <td className="px-4 py-3 text-sentinel-400 text-xs">{new Date(a.assessedAt).toLocaleString()}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
           {/* ── Future capabilities note ──────────────────────── */}
           <div className="p-3 bg-sentinel-850 border border-sentinel-700 rounded-lg">
             <p className="text-xs text-sentinel-400">
-              Release-risk metrics will be added in Phase 8 as the release risk assessment module is implemented.
+              SupplyChain Sentinel Phase 8 is complete. All modules are operational.
             </p>
           </div>
         </>

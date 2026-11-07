@@ -6,15 +6,18 @@ import com.supplychainsentinel.dto.RecentApplicationDto;
 import com.supplychainsentinel.dto.RecentArtifactVerificationDto;
 import com.supplychainsentinel.dto.RecentFindingDto;
 import com.supplychainsentinel.dto.RecentPipelineRunDto;
+import com.supplychainsentinel.dto.RecentReleaseAssessmentDto;
 import com.supplychainsentinel.dto.RecentSbomDto;
 import com.supplychainsentinel.entity.ArtifactVerification;
 import com.supplychainsentinel.entity.InventoryApplication;
 import com.supplychainsentinel.entity.PipelineRun;
+import com.supplychainsentinel.entity.ReleaseAssessment;
 import com.supplychainsentinel.entity.SbomDocument;
 import com.supplychainsentinel.entity.SecurityFinding;
 import com.supplychainsentinel.repository.ApplicationRepository;
 import com.supplychainsentinel.repository.ArtifactVerificationRepository;
 import com.supplychainsentinel.repository.PipelineRunRepository;
+import com.supplychainsentinel.repository.ReleaseAssessmentRepository;
 import com.supplychainsentinel.repository.SbomDocumentRepository;
 import com.supplychainsentinel.repository.SecurityFindingRepository;
 import org.springframework.data.domain.PageRequest;
@@ -39,19 +42,22 @@ public class DashboardService {
     private final SecurityFindingRepository findingRepository;
     private final SbomDocumentRepository sbomDocRepository;
     private final ArtifactVerificationRepository verificationRepository;
+    private final ReleaseAssessmentRepository assessmentRepository;
 
     public DashboardService(
             ApplicationRepository applicationRepository,
             PipelineRunRepository pipelineRunRepository,
             SecurityFindingRepository findingRepository,
             SbomDocumentRepository sbomDocRepository,
-            ArtifactVerificationRepository verificationRepository
+            ArtifactVerificationRepository verificationRepository,
+            ReleaseAssessmentRepository assessmentRepository
     ) {
         this.applicationRepository = applicationRepository;
         this.pipelineRunRepository = pipelineRunRepository;
         this.findingRepository = findingRepository;
         this.sbomDocRepository = sbomDocRepository;
         this.verificationRepository = verificationRepository;
+        this.assessmentRepository = assessmentRepository;
     }
 
     @Transactional(readOnly = true)
@@ -174,6 +180,30 @@ public class DashboardService {
                 ))
                 .toList();
 
+        // ── Release assessment KPI counts ─────────────────────
+        long totalAssessments = assessmentRepository.count();
+        long passCount = assessmentRepository.findAll((root, q, cb) ->
+                cb.equal(root.get("decision"), "PASS")).size();
+        long warnCount = assessmentRepository.findAll((root, q, cb) ->
+                cb.equal(root.get("decision"), "WARN")).size();
+        long blockCount = assessmentRepository.findAll((root, q, cb) ->
+                cb.equal(root.get("decision"), "BLOCK")).size();
+        long approvedCount = assessmentRepository.findAll((root, q, cb) ->
+                cb.equal(root.get("assessmentStatus"), "READY_FOR_DEPLOYMENT")).size();
+        long pendingApprovalCount = assessmentRepository.findAll((root, q, cb) ->
+                cb.equal(root.get("assessmentStatus"), "PENDING_APPROVAL")).size();
+
+        // ── Recent assessments (top 5 by assessedAt desc) ──────
+        List<ReleaseAssessment> recentAssessments = assessmentRepository
+                .findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "assessedAt")))
+                .getContent();
+        List<RecentReleaseAssessmentDto> recentAssessmentDtos = recentAssessments.stream()
+                .map(a -> new RecentReleaseAssessmentDto(
+                        a.getId(), a.getApplication().getName(),
+                        a.getDecision(), a.getRiskScore(), a.getAssessmentStatus(),
+                        a.getArtifactDigest(), a.getAssessedAt()))
+                .toList();
+
         return new DashboardSummaryDto(
                 total, active, critical, highCriticality, internetFacing, highCriticalInternetFacing,
                 criticalityDist, lifecycleDist, hostingDist, businessUnitDist,
@@ -183,7 +213,9 @@ public class DashboardService {
                 openFindings, criticalOpenFindings, highOpenFindings,
                 openBySeverity, recentFindingDtos,
                 totalSbomDocuments, totalSbomComponents, verifiedArtifacts, failedVerifications,
-                recentSbomDtos, recentVerificationDtos
+                recentSbomDtos, recentVerificationDtos,
+                totalAssessments, passCount, warnCount, blockCount,
+                approvedCount, pendingApprovalCount, recentAssessmentDtos
         );
     }
 }

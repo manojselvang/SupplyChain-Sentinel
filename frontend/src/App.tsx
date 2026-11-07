@@ -10,6 +10,7 @@ import Findings from './pages/Findings'
 import Sbom from './pages/Sbom'
 import ArtifactVerifications from './pages/ArtifactVerifications'
 import Releases from './pages/Releases'
+import ReleaseDetail from './pages/ReleaseDetail'
 import Policies from './pages/Policies'
 import Deployments from './pages/Deployments'
 import AuditLogs from './pages/AuditLogs'
@@ -34,6 +35,7 @@ export default function App() {
         <Route path="sbom" element={<Sbom />} />
         <Route path="artifact-verifications" element={<ArtifactVerifications />} />
         <Route path="releases" element={<Releases />} />
+        <Route path="releases/:id" element={<ReleaseDetail />} />
         <Route path="policies" element={<Policies />} />
         <Route path="deployments" element={<Deployments />} />
         <Route path="audit-logs" element={<AuditLogs />} />

@@ -138,6 +138,13 @@ export interface DashboardSummary {
   failedArtifactVerifications: number
   recentSbomDocuments: RecentSbom[]
   recentArtifactVerifications: RecentArtifactVerification[]
+  totalReleaseAssessments: number
+  passAssessments: number
+  warnAssessments: number
+  blockAssessments: number
+  approvedReleases: number
+  pendingApprovals: number
+  recentReleaseAssessments: RecentReleaseAssessment[]
 }
 
 export interface DistributionEntry {
@@ -307,3 +314,58 @@ export interface RecentArtifactVerification {
 
 export const VERIFICATION_STATUSES = ['VERIFIED', 'FAILED', 'MISSING_SIGNATURE', 'ERROR'] as const
 export const VERIFICATION_MODES = ['KEY', 'KEYLESS'] as const
+
+// ── Release Assurance ──────────────────────────────────────
+
+export interface ReleaseAssessment {
+  id: string
+  applicationId: string
+  applicationName: string
+  pipelineRunId: string
+  artifactDigest: string
+  riskScore: number
+  decision: string
+  policyVersion: string
+  assessmentStatus: string
+  hardBlockReasons: string | null
+  scoreBreakdown: string | null
+  evidenceSnapshot: string | null
+  requestedBy: string | null
+  assessedAt: string
+  createdAt: string
+  approvals: ReleaseApproval[]
+  auditHistory: AuditEvent[]
+}
+
+export interface ReleaseApproval {
+  id: string
+  approverId: string | null
+  decision: string
+  justification: string | null
+  approvedAt: string
+  createdAt: string
+}
+
+export interface AuditEvent {
+  id: string
+  actorId: string | null
+  actorRole: string | null
+  action: string
+  entityType: string | null
+  entityId: string | null
+  eventDetails: string | null
+  occurredAt: string
+}
+
+export interface RecentReleaseAssessment {
+  id: string
+  applicationName: string
+  decision: string
+  riskScore: number
+  assessmentStatus: string
+  artifactDigest: string | null
+  assessedAt: string
+}
+
+export const ASSESSMENT_DECISIONS = ['PASS', 'WARN', 'BLOCK'] as const
+export const ASSESSMENT_STATUSES = ['PENDING_APPROVAL', 'READY_FOR_DEPLOYMENT', 'REJECTED', 'BLOCKED'] as const

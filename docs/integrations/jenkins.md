@@ -1,131 +1,166 @@
 # Jenkins Integration
 
-This guide shows how to submit build metadata from Jenkins to SupplyChain Sentinel.
+Complete CI/CD pipeline integration with SupplyChain Sentinel — pipeline runs, security scans, SBOM, Cosign verification, and release gate evaluation.
 
 ## Prerequisites
 
-- SupplyChain Sentinel backend running and accessible from Jenkins
-- An `applicationKey` matching a registered application in the inventory
-- A Jenkins Credential storing the ingestion API key
+- SupplyChain Sentinel backend running
+- Jenkins Credential `scs-ingestion-key` (Secret text) containing `CI_INGESTION_API_KEY`
+- Syft, Trivy, and Cosign installed on Jenkins agents
 
-## API contract
-
-**Endpoint:** `POST /api/v1/integrations/pipeline-runs`  
-**Auth header:** `X-CI-INGESTION-KEY: <key>`  
-**Content-Type:** `application/json`
-
-The same endpoint is used by Jenkins and GitHub Actions — there is no separate backend per provider.
-
-## Jenkins Credential setup
-
-1. In Jenkins → **Manage Jenkins → Credentials → System → Global credentials**
-2. Add a **Secret text** credential
-3. Set **ID** to `scs-ingestion-key`
-4. Paste the value of `CI_INGESTION_API_KEY` from the backend configuration
-
-## Jenkinsfile
+## Complete Jenkinsfile
 
 ```groovy
 pipeline {
     agent any
 
     environment {
-        SCS_URL         = 'http://supplychain-sentinel:8080'
-        SCS_APP_KEY     = 'my-application'  // matches applicationKey in inventory
+        SCS_URL     = 'http://supplychain-sentinel:8080'
+        SCS_APP_KEY = 'payment-service'
     }
 
     stages {
-        stage('Notify — RUNNING') {
+        stage('Checkout') { steps { checkout scm } }
+
+        stage('Build') {
+            steps {
+                sh 'mvn clean package -DskipTests -B'
+                sh 'mvn test -B'
+            }
+        }
+
+        stage('Notify Pipeline — RUNNING') {
             steps {
                 withCredentials([string(credentialsId: 'scs-ingestion-key', variable: 'SCS_KEY')]) {
                     script {
                         def startedAt = new Date().toInstant().toString()
                         env.BUILD_STARTED_AT = startedAt
-
-                        def payload = groovy.json.JsonOutput.toJson([
-                            applicationKey: env.SCS_APP_KEY,
-                            provider      : 'JENKINS',
-                            externalRunId : env.BUILD_NUMBER,
-                            workflowName  : env.JOB_NAME,
-                            repositoryUrl : scm.getUserRemoteConfigs()[0].getUrl(),
-                            branchName    : env.GIT_BRANCH?.replaceFirst('origin/', '') ?: env.BRANCH_NAME,
-                            commitSha     : env.GIT_COMMIT,
-                            commitMessage : sh(script: 'git log -1 --pretty=%s', returnStdout: true).trim(),
-                            runNumber     : env.BUILD_NUMBER,
-                            triggerEvent  : env.BUILD_CAUSE ?: 'manual',
-                            status        : 'RUNNING',
-                            startedAt     : startedAt,
-                        ])
-
                         sh """
-                            curl -sf -X POST "${SCS_URL}/api/v1/integrations/pipeline-runs" \\
+                            curl -sf -X POST "\${SCS_URL}/api/v1/integrations/pipeline-runs" \\
                               -H 'Content-Type: application/json' \\
                               -H "X-CI-INGESTION-KEY: \${SCS_KEY}" \\
-                              -d '${payload}' || echo 'SCS notification failed (non-blocking)'
+                              -d '{"applicationKey":"\${SCS_APP_KEY}","provider":"JENKINS","externalRunId":"\${BUILD_NUMBER}","workflowName":"\${JOB_NAME}","repositoryUrl":"\${GIT_URL}","branchName":"main","commitSha":"\${GIT_COMMIT}","status":"RUNNING","startedAt":"\${startedAt}"}'
                         """
                     }
                 }
             }
         }
 
-        stage('Checkout') {
+        stage('Trivy Vulnerability Scan') {
             steps {
-                checkout scm
+                sh 'trivy fs --scanners vuln --format json --output trivy-report.json ./backend'
             }
         }
 
-        stage('Build') {
+        stage('Generate SBOM') {
             steps {
-                sh 'mvn clean package -DskipTests -B'
+                sh 'syft scan dir:./backend -o cyclonedx-json@1.7=sbom.cdx.json'
             }
         }
 
-        stage('Test') {
+        stage('Build Container Image') {
             steps {
-                sh 'mvn test -B'
-            }
-        }
-    }
-
-    post {
-        always {
-            withCredentials([string(credentialsId: 'scs-ingestion-key', variable: 'SCS_KEY')]) {
                 script {
-                    def finalStatus = currentBuild.result == 'SUCCESS' ? 'SUCCESS' : 'FAILED'
-                    def completedAt = new Date().toInstant().toString()
+                    sh 'docker build -t app:latest .'
+                    env.IMAGE_DIGEST = sh(script: 'docker inspect app:latest --format="{{index .RepoDigests 0}}" | grep -oP "sha256:\\K.*"', returnStdout: true).trim()
+                }
+            }
+        }
 
-                    // Calculate artifact digest when present
-                    def digest = ''
-                    if (fileExists('target/app.jar')) {
-                        def sha256 = sh(
-                            script: "sha256sum target/app.jar | awk '{print \$1}'",
-                            returnStdout: true
-                        ).trim()
-                        if (sha256 ==~ /[a-fA-F0-9]{64}/) digest = sha256
+        stage('Cosign Verification') {
+            steps {
+                withCredentials([string(credentialsId: 'scs-ingestion-key', variable: 'SCS_KEY')]) {
+                    script {
+                        def ref = "app@sha256:${env.IMAGE_DIGEST}"
+                        def cosignVer = sh(script: 'cosign version | head -1 | awk \'{print $NF}\'', returnStdout: true).trim()
+                        def now = new Date().toInstant().toString()
+
+                        try {
+                            sh "cosign-windows-amd64.exe verify --key cosign.pub ${ref}"
+                            env.VERIFY_STATUS = "VERIFIED"
+                        } catch (e) {
+                            env.VERIFY_STATUS = "FAILED"
+                        }
+
+                        sh """
+                            curl -sf -X POST "\${SCS_URL}/api/v1/integrations/artifact-verifications" \\
+                              -H 'Content-Type: application/json' \\
+                              -H "X-CI-INGESTION-KEY: \${SCS_KEY}" \\
+                              -d '{"applicationKey":"\${SCS_APP_KEY}","artifactReference":"\${ref}","artifactDigest":"\${IMAGE_DIGEST}","verificationMode":"KEY","verificationStatus":"\${VERIFY_STATUS}","signerIdentity":"Jenkins CI","publicKeyFingerprint":"cosign-pub-fp","cosignVersion":"\${cosignVer}","verifiedAt":"\${now}","reportedAt":"\${now}"}'
+                        """
                     }
+                }
+            }
+        }
 
-                    def payload = groovy.json.JsonOutput.toJson([
-                        applicationKey : env.SCS_APP_KEY,
-                        provider       : 'JENKINS',
-                        externalRunId  : env.BUILD_NUMBER,
-                        workflowName   : env.JOB_NAME,
-                        repositoryUrl  : scm.getUserRemoteConfigs()[0].getUrl(),
-                        branchName     : env.GIT_BRANCH?.replaceFirst('origin/', '') ?: env.BRANCH_NAME,
-                        commitSha      : env.GIT_COMMIT,
-                        runNumber      : env.BUILD_NUMBER,
-                        status         : finalStatus,
-                        startedAt      : env.BUILD_STARTED_AT,
-                        completedAt    : completedAt,
-                        artifactName   : 'app.jar',
-                        artifactDigest : digest ?: null,
-                    ])
-
+        stage('Submit Trivy Report') {
+            steps {
+                withCredentials([string(credentialsId: 'scs-ingestion-key', variable: 'SCS_KEY')]) {
                     sh """
-                        curl -sf -X POST "${SCS_URL}/api/v1/integrations/pipeline-runs" \\
+                        jq -n --arg appKey "\${SCS_APP_KEY}" \\
+                          --slurpfile report trivy-report.json \\
+                          '{applicationKey:\$appKey, scanner:"trivy", reportFormat:"TRIVY_JSON", scanTimestamp:"\${BUILD_STARTED_AT}", report:\$report[0]}' \\
+                        | curl -sf -X POST "\${SCS_URL}/api/v1/integrations/security-scans" \\
                           -H 'Content-Type: application/json' \\
                           -H "X-CI-INGESTION-KEY: \${SCS_KEY}" \\
-                          -d '${payload}' || echo 'SCS notification failed (non-blocking)'
+                          -d @-
                     """
+                }
+            }
+        }
+
+        stage('Submit SBOM') {
+            steps {
+                withCredentials([string(credentialsId: 'scs-ingestion-key', variable: 'SCS_KEY')]) {
+                    sh """
+                        jq -n --arg appKey "\${SCS_APP_KEY}" \\
+                          --arg digest "\${IMAGE_DIGEST}" \\
+                          --slurpfile sbom sbom.cdx.json \\
+                          '{applicationKey:\$appKey, artifactDigest:\$digest, sbom:\$sbom[0]}' \\
+                        | curl -sf -X POST "\${SCS_URL}/api/v1/integrations/sboms" \\
+                          -H 'Content-Type: application/json' \\
+                          -H "X-CI-INGESTION-KEY: \${SCS_KEY}" \\
+                          -d @-
+                    """
+                }
+            }
+        }
+
+        stage('Notify Pipeline — SUCCESS') {
+            steps {
+                withCredentials([string(credentialsId: 'scs-ingestion-key', variable: 'SCS_KEY')]) {
+                    sh """
+                        curl -sf -X POST "\${SCS_URL}/api/v1/integrations/pipeline-runs" \\
+                          -H 'Content-Type: application/json' \\
+                          -H "X-CI-INGESTION-KEY: \${SCS_KEY}" \\
+                          -d '{"applicationKey":"\${SCS_APP_KEY}","provider":"JENKINS","externalRunId":"\${BUILD_NUMBER}","workflowName":"\${JOB_NAME}","repositoryUrl":"\${GIT_URL}","branchName":"main","commitSha":"\${GIT_COMMIT}","status":"SUCCESS","startedAt":"\${BUILD_STARTED_AT}","completedAt":"\${new Date().toInstant().toString()}","artifactDigest":"\${IMAGE_DIGEST}"}'
+                    """
+                }
+            }
+        }
+
+        stage('Evaluate Release Gate') {
+            steps {
+                withCredentials([string(credentialsId: 'scs-ingestion-key', variable: 'SCS_KEY')]) {
+                    script {
+                        def gateResponse = sh(
+                            script: """
+                                curl -sf -X POST "\${SCS_URL}/api/v1/integrations/release-gates/evaluate" \\
+                                  -H 'Content-Type: application/json' \\
+                                  -H "X-CI-INGESTION-KEY: \${SCS_KEY}" \\
+                                  -d '{"applicationKey":"\${SCS_APP_KEY}","pipelineRunId":"\${BUILD_NUMBER}"}'
+                            """,
+                            returnStdout: true
+                        ).trim()
+
+                        def decision = readJSON(text: gateResponse).decision
+                        echo "Release gate decision: ${decision}"
+
+                        if (decision == "BLOCK") {
+                            error("Release gate BLOCKED — security requirements not met")
+                        }
+                        // PASS: continue; WARN: requires documented manual approval
+                    }
                 }
             }
         }
@@ -133,9 +168,14 @@ pipeline {
 }
 ```
 
-## Notes
+## CI Status Design
 
-- The `RUNNING` call and the final `post { always }` call share the same `externalRunId` (Jenkins build number + job name). The second call updates the existing record — it does **not** create a duplicate.
-- The `curl` calls use `|| echo ...` so a SupplyChain Sentinel outage does not block the Jenkins build.
-- The credential value is bound to `SCS_KEY` and never echoed or printed in logs.
-- Adjust `SCS_URL` and `SCS_APP_KEY` via Jenkins environment variables or parameters for multi-application pipelines.
+`pipeline_runs.status = SUCCESS` means the build, tests, and evidence-generation workflow completed. The release gate evaluation is a **separate** stage that reads the evidence. The gate outcome is recorded independently.
+
+## Release Gate Handling
+
+| Decision | CI Behavior |
+|----------|-------------|
+| PASS | Continue deployment |
+| WARN | Require documented manual approval (human reviewer) |
+| BLOCK | Fail the Jenkins build — do not deploy |
