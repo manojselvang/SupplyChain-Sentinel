@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   # ──────────────────────────────────────────────
   # PostgreSQL
@@ -48,6 +46,7 @@ services:
       INITIAL_ADMIN_USERNAME: ${INITIAL_ADMIN_USERNAME:-admin}
       INITIAL_ADMIN_PASSWORD: ${INITIAL_ADMIN_PASSWORD:-changeme123}
       INITIAL_ADMIN_EMAIL: ${INITIAL_ADMIN_EMAIL:-admin@supplychainsentinel.local}
+      CI_INGESTION_API_KEY: ${CI_INGESTION_API_KEY:-}
     ports:
       - "8080:8080"
     networks:
