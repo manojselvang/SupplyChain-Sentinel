@@ -9,6 +9,23 @@ backend/target/
 backend/.env
 backend/*.log
 
+# Generated scanner reports and SBOMs (produced during validation, not source artifacts)
+backend/*.cdx.json
+backend/trivy-report.json
+backend/signoff-trivy.json
+backend/run.sh
+
+# Cosign key material (NEVER commit private keys)
+*.key
+*.pub
+backend/*.key
+backend/*.pub
+
+# Cosign bundles and signatures
+*.bundle.json
+*-bundle.json
+*.sig
+
 # Frontend
 frontend/node_modules/
 frontend/dist/
