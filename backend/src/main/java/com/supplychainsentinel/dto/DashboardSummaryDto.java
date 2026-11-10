@@ -69,5 +69,14 @@ public record DashboardSummaryDto(
         long pendingApprovals,
 
         // ── Recent assessments (top 5 by assessed_at desc) ─
-        List<RecentReleaseAssessmentDto> recentReleaseAssessments
+        List<RecentReleaseAssessmentDto> recentReleaseAssessments,
+
+        // ── Deployment KPI counts ────────────────────────────
+        long totalDeployments,
+        long successfulDeployments,
+        long failedDeployments,
+        long degradedDeployments,
+
+        // ── Recent deployments (top 5 by deployed_at desc) ──
+        List<RecentDeploymentDto> recentDeployments
 ) {}

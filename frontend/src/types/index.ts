@@ -145,6 +145,11 @@ export interface DashboardSummary {
   approvedReleases: number
   pendingApprovals: number
   recentReleaseAssessments: RecentReleaseAssessment[]
+  totalDeployments: number
+  successfulDeployments: number
+  failedDeployments: number
+  degradedDeployments: number
+  recentDeployments: RecentDeployment[]
 }
 
 export interface DistributionEntry {
@@ -369,3 +374,45 @@ export interface RecentReleaseAssessment {
 
 export const ASSESSMENT_DECISIONS = ['PASS', 'WARN', 'BLOCK'] as const
 export const ASSESSMENT_STATUSES = ['PENDING_APPROVAL', 'READY_FOR_DEPLOYMENT', 'REJECTED', 'BLOCKED'] as const
+
+// ── Deployments (Argo CD) ───────────────────────────────────
+
+export interface DeploymentRecord {
+  id: string
+  applicationId: string
+  applicationName: string
+  pipelineRunId: string | null
+  releaseAssessmentId: string | null
+  argocdApplication: string
+  argocdProject: string | null
+  environment: string
+  cluster: string | null
+  namespace: string | null
+  gitRepoUrl: string | null
+  gitRevision: string | null
+  imageReference: string
+  imageDigest: string | null
+  syncStatus: string
+  healthStatus: string
+  operationPhase: string | null
+  deployedAt: string
+  completedAt: string | null
+  externalEventId: string
+  createdAt: string
+  updatedAt: string
+  digestMatchesAssessment: boolean
+}
+
+export interface RecentDeployment {
+  id: string
+  applicationName: string
+  argocdApplication: string
+  environment: string
+  syncStatus: string
+  healthStatus: string
+  imageDigest: string | null
+  deployedAt: string
+}
+
+export const SYNC_STATUSES = ['SYNCED', 'OUT_OF_SYNC', 'PENDING', 'ERROR', 'UNKNOWN'] as const
+export const HEALTH_STATUSES = ['HEALTHY', 'DEGRADED', 'PROGRESSING', 'SUSPENDED', 'MISSING', 'UNKNOWN'] as const

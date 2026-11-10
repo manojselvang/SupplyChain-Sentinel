@@ -8,9 +8,10 @@ import { getApplicationPipelineRuns } from '../api/pipelineRuns'
 import { getApplicationSecurityFindings } from '../api/securityFindings'
 import { getApplicationSboms } from '../api/sboms'
 import { getApplicationArtifactVerifications } from '../api/artifactVerifications'
+import { getApplicationDeployments } from '../api/deployments'
 import { extractApiError } from '../api/client'
 import { useAuth } from '../context/AuthContext'
-import type { Application, PipelineRun, SecurityFinding, SbomDocument, ArtifactVerification, Page } from '../types'
+import type { Application, PipelineRun, SecurityFinding, SbomDocument, ArtifactVerification, DeploymentRecord, Page } from '../types'
 
 // ── Detail field component ─────────────────────────────────
 
@@ -69,6 +70,10 @@ export default function ApplicationDetail() {
   const [verifications, setVerifications] = useState<Page<ArtifactVerification> | null>(null)
   const [verificationsLoading, setVerificationsLoading] = useState(false)
 
+  // Deployment state
+  const [deployments, setDeployments] = useState<Page<DeploymentRecord> | null>(null)
+  const [deploymentsLoading, setDeploymentsLoading] = useState(false)
+
   const fetchApp = useCallback(async () => {
     if (!id) return
     setLoading(true)
@@ -125,13 +130,22 @@ export default function ApplicationDetail() {
     finally { setVerificationsLoading(false) }
   }, [id])
 
+  const fetchDeployments = useCallback(async () => {
+    if (!id) return
+    setDeploymentsLoading(true)
+    try { setDeployments(await getApplicationDeployments(id, 0, 5)) }
+    catch { }
+    finally { setDeploymentsLoading(false) }
+  }, [id])
+
   useEffect(() => {
     fetchApp()
     fetchPipelineRuns()
     fetchFindings()
     fetchSboms()
     fetchVerifications()
-  }, [fetchApp, fetchPipelineRuns, fetchFindings, fetchSboms, fetchVerifications])
+    fetchDeployments()
+  }, [fetchApp, fetchPipelineRuns, fetchFindings, fetchSboms, fetchVerifications, fetchDeployments])
 
   const handleDelete = async () => {
     if (!app) return
@@ -427,6 +441,61 @@ export default function ApplicationDetail() {
                       <td className="px-4 py-3 text-sentinel-400 font-mono text-xs">{v.artifactReference ? v.artifactReference.substring(v.artifactReference.lastIndexOf('@'), v.artifactReference.lastIndexOf('@') + 14) + '…' : '—'}</td>
                       <td className="px-4 py-3 text-sentinel-400 text-xs">{v.signerIdentity ? v.signerIdentity.substring(0, 30) + (v.signerIdentity.length > 30 ? '…' : '') : v.publicKeyFingerprint ? v.publicKeyFingerprint.substring(0, 12) + '…' : '—'}</td>
                       <td className="px-4 py-3 text-sentinel-400 text-xs">{new Date(v.reportedAt).toLocaleString()}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* Deployment history */}
+      <div className="card overflow-hidden mb-4">
+        <div className="px-5 py-4 border-b border-sentinel-800">
+          <h3 className="text-sm font-medium text-sentinel-200">Deployment History</h3>
+          <p className="text-xs text-sentinel-500 mt-0.5">Argo CD deployment events</p>
+        </div>
+        {deploymentsLoading ? (
+          <div className="flex items-center justify-center py-8"><div className="w-6 h-6 border-2 border-accent-500 border-t-transparent rounded-full animate-spin" /></div>
+        ) : !deployments || deployments.content.length === 0 ? (
+          <div className="px-5 py-8 text-center text-sentinel-500 text-sm">No deployment records yet.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-sentinel-850 border-b border-sentinel-800">
+                <tr className="text-left text-sentinel-400">
+                  <th className="px-4 py-3 font-medium">Argo CD App</th>
+                  <th className="px-4 py-3 font-medium">Environment</th>
+                  <th className="px-4 py-3 font-medium">Image Digest</th>
+                  <th className="px-4 py-3 font-medium">Sync</th>
+                  <th className="px-4 py-3 font-medium">Health</th>
+                  <th className="px-4 py-3 font-medium">Deployed</th>
+                </tr>
+              </thead>
+              <tbody>
+                {deployments.content.map(d => {
+                  const syncCls = d.syncStatus === 'SYNCED' ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                    : d.syncStatus === 'ERROR' ? 'bg-red-500/15 text-red-400 border border-red-500/30'
+                    : 'bg-sentinel-700/40 text-sentinel-400 border border-sentinel-600/50'
+                  const healthCls = d.healthStatus === 'HEALTHY' ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                    : d.healthStatus === 'DEGRADED' ? 'bg-red-500/15 text-red-400 border border-red-500/30'
+                    : 'bg-sentinel-700/40 text-sentinel-400 border border-sentinel-600/50'
+                  return (
+                    <tr key={d.id} className="border-b border-sentinel-800/50 hover:bg-sentinel-850/50">
+                      <td className="px-4 py-3 text-sentinel-200">{d.argocdApplication}</td>
+                      <td className="px-4 py-3"><span className="badge badge-info">{d.environment}</span></td>
+                      <td className="px-4 py-3 text-sentinel-400 font-mono text-xs">
+                        {d.imageDigest ? d.imageDigest.substring(0, 12) + '…' : '—'}
+                        {d.releaseAssessmentId && (
+                          <span className={`ml-1 ${d.digestMatchesAssessment ? 'text-green-400' : 'text-red-400'}`}>
+                            {d.digestMatchesAssessment ? '✓' : '✗'}
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3"><span className={`badge ${syncCls}`}>{d.syncStatus}</span></td>
+                      <td className="px-4 py-3"><span className={`badge ${healthCls}`}>{d.healthStatus}</span></td>
+                      <td className="px-4 py-3 text-sentinel-400 text-xs">{new Date(d.deployedAt).toLocaleString()}</td>
                     </tr>
                   )
                 })}

@@ -23,19 +23,22 @@ public class IngestionController {
     private final SbomService sbomService;
     private final ArtifactVerificationService artifactVerificationService;
     private final ReleaseAssessmentService releaseAssessmentService;
+    private final DeploymentRecordService deploymentRecordService;
 
     public IngestionController(
             PipelineRunService pipelineRunService,
             SecurityFindingService securityFindingService,
             SbomService sbomService,
             ArtifactVerificationService artifactVerificationService,
-            ReleaseAssessmentService releaseAssessmentService
+            ReleaseAssessmentService releaseAssessmentService,
+            DeploymentRecordService deploymentRecordService
     ) {
         this.pipelineRunService = pipelineRunService;
         this.securityFindingService = securityFindingService;
         this.sbomService = sbomService;
         this.artifactVerificationService = artifactVerificationService;
         this.releaseAssessmentService = releaseAssessmentService;
+        this.deploymentRecordService = deploymentRecordService;
     }
 
     @PostMapping("/pipeline-runs")
@@ -84,5 +87,15 @@ public class IngestionController {
         CiReleaseGateResponse result = releaseAssessmentService.evaluateReleaseGate(
                 request.applicationKey(), java.util.UUID.fromString(request.pipelineRunId()));
         return ResponseEntity.ok(result);
+    }
+
+    @PostMapping("/deployments")
+    @Operation(summary = "Submit Argo CD deployment event (API key auth)")
+    public ResponseEntity<DeploymentRecordResponse> ingestDeployment(
+            @Valid @RequestBody DeploymentIngestionRequest request
+    ) {
+        DeploymentRecordService.IngestionResult result = deploymentRecordService.ingest(request);
+        return ResponseEntity.status(result.created() ? HttpStatus.CREATED : HttpStatus.OK)
+                .body(result.response());
     }
 }

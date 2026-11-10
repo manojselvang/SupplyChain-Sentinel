@@ -4,11 +4,13 @@ import com.supplychainsentinel.dto.DashboardSummaryDto;
 import com.supplychainsentinel.dto.DistributionEntry;
 import com.supplychainsentinel.dto.RecentApplicationDto;
 import com.supplychainsentinel.dto.RecentArtifactVerificationDto;
+import com.supplychainsentinel.dto.RecentDeploymentDto;
 import com.supplychainsentinel.dto.RecentFindingDto;
 import com.supplychainsentinel.dto.RecentPipelineRunDto;
 import com.supplychainsentinel.dto.RecentReleaseAssessmentDto;
 import com.supplychainsentinel.dto.RecentSbomDto;
 import com.supplychainsentinel.entity.ArtifactVerification;
+import com.supplychainsentinel.entity.DeploymentRecord;
 import com.supplychainsentinel.entity.InventoryApplication;
 import com.supplychainsentinel.entity.PipelineRun;
 import com.supplychainsentinel.entity.ReleaseAssessment;
@@ -16,6 +18,7 @@ import com.supplychainsentinel.entity.SbomDocument;
 import com.supplychainsentinel.entity.SecurityFinding;
 import com.supplychainsentinel.repository.ApplicationRepository;
 import com.supplychainsentinel.repository.ArtifactVerificationRepository;
+import com.supplychainsentinel.repository.DeploymentRecordRepository;
 import com.supplychainsentinel.repository.PipelineRunRepository;
 import com.supplychainsentinel.repository.ReleaseAssessmentRepository;
 import com.supplychainsentinel.repository.SbomDocumentRepository;
@@ -43,6 +46,7 @@ public class DashboardService {
     private final SbomDocumentRepository sbomDocRepository;
     private final ArtifactVerificationRepository verificationRepository;
     private final ReleaseAssessmentRepository assessmentRepository;
+    private final DeploymentRecordRepository deploymentRepository;
 
     public DashboardService(
             ApplicationRepository applicationRepository,
@@ -50,7 +54,8 @@ public class DashboardService {
             SecurityFindingRepository findingRepository,
             SbomDocumentRepository sbomDocRepository,
             ArtifactVerificationRepository verificationRepository,
-            ReleaseAssessmentRepository assessmentRepository
+            ReleaseAssessmentRepository assessmentRepository,
+            DeploymentRecordRepository deploymentRepository
     ) {
         this.applicationRepository = applicationRepository;
         this.pipelineRunRepository = pipelineRunRepository;
@@ -58,6 +63,7 @@ public class DashboardService {
         this.sbomDocRepository = sbomDocRepository;
         this.verificationRepository = verificationRepository;
         this.assessmentRepository = assessmentRepository;
+        this.deploymentRepository = deploymentRepository;
     }
 
     @Transactional(readOnly = true)
@@ -204,6 +210,24 @@ public class DashboardService {
                         a.getArtifactDigest(), a.getAssessedAt()))
                 .toList();
 
+        // ── Deployment KPI counts ─────────────────────────────
+        long totalDeployments = deploymentRepository.countAllDeployments();
+        long successfulDeployments = deploymentRepository.countSuccessful();
+        long failedDeployments = deploymentRepository.countFailed();
+        long degradedDeployments = deploymentRepository.countDegraded();
+
+        // ── Recent deployments (top 5 by deployedAt desc) ──────
+        List<DeploymentRecord> recentDeploymentsList = deploymentRepository
+                .findAll(PageRequest.of(0, 5, Sort.by(Sort.Direction.DESC, "deployedAt")))
+                .getContent();
+        List<RecentDeploymentDto> recentDeploymentDtos = recentDeploymentsList.stream()
+                .map(d -> new RecentDeploymentDto(
+                        d.getId(), d.getApplication().getName(),
+                        d.getArgocdApplication(), d.getEnvironment(),
+                        d.getSyncStatus(), d.getHealthStatus(),
+                        d.getImageDigest(), d.getDeployedAt()))
+                .toList();
+
         return new DashboardSummaryDto(
                 total, active, critical, highCriticality, internetFacing, highCriticalInternetFacing,
                 criticalityDist, lifecycleDist, hostingDist, businessUnitDist,
@@ -215,7 +239,9 @@ public class DashboardService {
                 totalSbomDocuments, totalSbomComponents, verifiedArtifacts, failedVerifications,
                 recentSbomDtos, recentVerificationDtos,
                 totalAssessments, passCount, warnCount, blockCount,
-                approvedCount, pendingApprovalCount, recentAssessmentDtos
+                approvedCount, pendingApprovalCount, recentAssessmentDtos,
+                totalDeployments, successfulDeployments, failedDeployments, degradedDeployments,
+                recentDeploymentDtos
         );
     }
 }

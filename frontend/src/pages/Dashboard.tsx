@@ -4,7 +4,7 @@ import ReactECharts from 'echarts-for-react'
 import PageHeader from '../components/PageHeader'
 import { getDashboardSummary } from '../api/dashboard'
 import { extractApiError } from '../api/client'
-import type { DashboardSummary, DistributionEntry, RecentFinding, RecentSbom, RecentArtifactVerification, RecentReleaseAssessment } from '../types'
+import type { DashboardSummary, DistributionEntry, RecentFinding, RecentSbom, RecentArtifactVerification, RecentReleaseAssessment, RecentDeployment } from '../types'
 
 // ── KPI card ─────────────────────────────────────────────────
 
@@ -404,6 +404,58 @@ export default function Dashboard() {
                           <td className="px-4 py-3"><span className={`badge ${dc} font-semibold`}>{a.decision}</span></td>
                           <td className="px-4 py-3 text-sentinel-400 text-xs">{a.assessmentStatus.replace('_', ' ')}</td>
                           <td className="px-4 py-3 text-sentinel-400 text-xs">{new Date(a.assessedAt).toLocaleString()}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+
+          {/* ── Deployment KPIs ────────────────────────────── */}
+          <p className="text-xs text-sentinel-500 uppercase tracking-widest mb-2">Deployments (Argo CD)</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <KpiCard label="Total Deployments" value={data.totalDeployments} color="bg-blue-400" />
+            <KpiCard label="Successful" value={data.successfulDeployments} color="bg-green-500" />
+            <KpiCard label="Failed" value={data.failedDeployments} color="bg-red-500" />
+            <KpiCard label="Degraded" value={data.degradedDeployments} color="bg-amber-500" />
+          </div>
+
+          {/* ── Recent deployments ──────────────────────────── */}
+          <div className="card overflow-hidden mb-4">
+            <h3 className="text-sm font-medium text-sentinel-200 px-5 py-4 border-b border-sentinel-800">Recent Deployments</h3>
+            {data.recentDeployments.length === 0 ? (
+              <div className="px-5 py-8 text-center text-sentinel-500">No deployments yet.</div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="bg-sentinel-850 border-b border-sentinel-800">
+                    <tr className="text-left text-sentinel-400">
+                      <th className="px-4 py-3 font-medium">Application</th>
+                      <th className="px-4 py-3 font-medium">Argo CD App</th>
+                      <th className="px-4 py-3 font-medium">Env</th>
+                      <th className="px-4 py-3 font-medium">Sync</th>
+                      <th className="px-4 py-3 font-medium">Health</th>
+                      <th className="px-4 py-3 font-medium">Deployed</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.recentDeployments.map((d: RecentDeployment) => {
+                      const sc = d.syncStatus === 'SYNCED' ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                        : d.syncStatus === 'ERROR' ? 'bg-red-500/15 text-red-400 border border-red-500/30'
+                        : 'bg-sentinel-700/40 text-sentinel-400 border border-sentinel-600/50'
+                      const hc = d.healthStatus === 'HEALTHY' ? 'bg-green-500/15 text-green-400 border border-green-500/30'
+                        : d.healthStatus === 'DEGRADED' ? 'bg-red-500/15 text-red-400 border border-red-500/30'
+                        : 'bg-sentinel-700/40 text-sentinel-400 border border-sentinel-600/50'
+                      return (
+                        <tr key={d.id} className="border-b border-sentinel-800/50 hover:bg-sentinel-850/50">
+                          <td className="px-4 py-3 text-sentinel-100">{d.applicationName}</td>
+                          <td className="px-4 py-3 text-sentinel-300">{d.argocdApplication}</td>
+                          <td className="px-4 py-3"><span className="badge badge-info">{d.environment}</span></td>
+                          <td className="px-4 py-3"><span className={`badge ${sc}`}>{d.syncStatus}</span></td>
+                          <td className="px-4 py-3"><span className={`badge ${hc}`}>{d.healthStatus}</span></td>
+                          <td className="px-4 py-3 text-sentinel-400 text-xs">{new Date(d.deployedAt).toLocaleString()}</td>
                         </tr>
                       )
                     })}
