@@ -69,6 +69,7 @@ public class SecurityConfig {
                     "/api/v1/ping",
                     "/api/v1/integrations/**",
                     "/actuator/health",
+                    "/actuator/health/**",
                     "/swagger-ui/**",
                     "/api-docs/**",
                     "/v3/api-docs/**"

@@ -25,3 +25,15 @@ app:
     cookie-secure: ${APP_COOKIE_SECURE:false}
   ci:
     ingestion-api-key: ${CI_INGESTION_API_KEY:dev-only-ingestion-key-change-me}
+
+# Actuator health probe groups (mirrors prod; useful for local testing with curl)
+management:
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true

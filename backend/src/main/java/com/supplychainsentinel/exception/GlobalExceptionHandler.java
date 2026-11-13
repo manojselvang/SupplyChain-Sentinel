@@ -15,6 +15,7 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.servlet.NoHandlerFoundException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 import java.util.List;
 
@@ -118,6 +119,24 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(NoHandlerFoundException.class)
     public ResponseEntity<ApiError> handleNotFound(
             NoHandlerFoundException ex, HttpServletRequest request) {
+        ApiError body = new ApiError(
+                HttpStatus.NOT_FOUND.value(),
+                "Not Found",
+                "The requested resource was not found",
+                request.getRequestURI()
+        );
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    /**
+     * Handles {@code NoResourceFoundException} thrown by Spring 6.x when a static
+     * resource lookup fails (e.g. Swagger UI when springdoc is disabled in prod).
+     * Without this handler, the exception falls through to the generic handler
+     * and returns 500. This ensures a clean 404 without exposing stack traces.
+     */
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ApiError> handleNoResourceFound(
+            NoResourceFoundException ex, HttpServletRequest request) {
         ApiError body = new ApiError(
                 HttpStatus.NOT_FOUND.value(),
                 "Not Found",

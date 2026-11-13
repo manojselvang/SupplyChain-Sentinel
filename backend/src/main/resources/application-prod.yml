@@ -1,5 +1,9 @@
-# Production profile - all values from environment variables.
-# Designed for AWS EKS deployment with RDS PostgreSQL.
+# ============================================================
+# Production profile — AWS EKS + RDS PostgreSQL
+# ALL values must come from environment variables.
+# No insecure fallback defaults are permitted here.
+# ============================================================
+
 spring:
   datasource:
     url: jdbc:postgresql://${DB_HOST}:${DB_PORT:5432}/${DB_NAME}
@@ -17,18 +21,61 @@ spring:
 server:
   port: ${SERVER_PORT:8080}
 
-# CORS origins from env var (e.g., CloudFront distribution domain)
+# ── API documentation ──────────────────────────────────────
+# Disabled in production. The OpenAPI spec and Swagger UI must not
+# be exposed publicly. Enable only in a network-restricted context.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+# ── Actuator health probe groups ──────────────────────────
+# Kubernetes uses /actuator/health/liveness and /actuator/health/readiness.
+# The liveness group checks only that the JVM is alive (no DB).
+# The readiness group checks the DB connection — if Flyway is migrating
+# or the DB is unreachable, the pod is not ready to receive traffic.
+management:
+  endpoint:
+    health:
+      show-details: when_authorized
+      probes:
+        enabled: true
+      group:
+        # liveness → only JVM liveness (NO database — avoids pod restart on transient DB outage)
+        liveness:
+          include: livenessState
+        # readiness → readinessState + database (pod not ready if DB unreachable)
+        readiness:
+          include: readinessState,db
+  health:
+    livenessState:
+      enabled: true
+    readinessState:
+      enabled: true
+    db:
+      enabled: true
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+# ── CORS origins (CloudFront distribution hostname) ────────
 app:
   cors:
-    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS:https://localhost}
+    allowed-origins: ${APP_CORS_ALLOWED_ORIGINS}
   jwt:
-    # JWT_SECRET MUST be provided in production — no default.
+    # JWT_SECRET MUST be provided — no default. @NotBlank enforced at startup.
     secret: ${JWT_SECRET}
+    # Secure cookie is mandatory over HTTPS in production.
     cookie-secure: ${APP_COOKIE_SECURE:true}
   admin:
     username: ${INITIAL_ADMIN_USERNAME:}
     password: ${INITIAL_ADMIN_PASSWORD:}
     email: ${INITIAL_ADMIN_EMAIL:}
+  # Production config validator checks this is set and meets minimum length.
+  production:
+    validate-on-startup: true
 
 logging:
   level:
