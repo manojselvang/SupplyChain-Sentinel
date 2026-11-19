@@ -13,35 +13,41 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 class ProductionConfigValidatorTest {
 
     private static final String GOOD_SECRET = "valid-secret-key-at-least-32-bytes-long!!!";
-    private static final String GOOD_KEY    = "valid-ingestion-key-at-least-32-bytes-long!";
-    private static final String GOOD_HOST   = "mydb.cluster-xyz.us-east-1.rds.amazonaws.com";
-    private static final String GOOD_PORT   = "5432";
-    private static final String GOOD_CORS   = "https://sentinel.example.com";
-    private static final String GOOD_DB     = "supplychain_sentinel";
-    private static final String GOOD_USER   = "appuser";
-    private static final String GOOD_PASS   = "MySecureRdsPassword123!";
+    private static final String GOOD_KEY       = "valid-ingestion-key-at-least-32-bytes-long!";
+    private static final String GOOD_HOST      = "mydb.cluster-xyz.us-east-1.rds.amazonaws.com";
+    private static final String GOOD_PORT      = "5432";
+    private static final String GOOD_CORS      = "https://sentinel.example.com";
+    private static final String GOOD_DB        = "supplychain_sentinel";
+    private static final String GOOD_USER      = "appuser";
+    private static final String GOOD_PASS      = "MySecureRdsPassword123!";
+    private static final String GOOD_MIG_USER  = "scs_migrator";
+    private static final String GOOD_MIG_PASS  = "MigratorSecurePassword456!";
 
     private ProductionConfigValidator buildValidator(
             String dbHost, String dbPort, String dbName, String dbUser, String dbPass,
+            String dbMigratorUsername, String dbMigratorPassword,
             String jwtSecret, String ingestionKey, String corsOrigins,
             boolean cookieSecure) throws Exception {
         ProductionConfigValidator v = new ProductionConfigValidator();
-        setField(v, "validateOnStartup", true);
-        setField(v, "dbHost",       dbHost);
-        setField(v, "dbPort",       dbPort);
-        setField(v, "dbName",       dbName);
-        setField(v, "dbUsername",   dbUser);
-        setField(v, "dbPassword",   dbPass);
-        setField(v, "jwtSecret",    jwtSecret);
-        setField(v, "ingestionKey", ingestionKey);
-        setField(v, "corsOrigins",  corsOrigins);
-        setField(v, "cookieSecure", cookieSecure);
+        setField(v, "validateOnStartup",   true);
+        setField(v, "dbHost",              dbHost);
+        setField(v, "dbPort",              dbPort);
+        setField(v, "dbName",              dbName);
+        setField(v, "dbUsername",          dbUser);
+        setField(v, "dbPassword",          dbPass);
+        setField(v, "dbMigratorUsername",  dbMigratorUsername);
+        setField(v, "dbMigratorPassword",  dbMigratorPassword);
+        setField(v, "jwtSecret",           jwtSecret);
+        setField(v, "ingestionKey",        ingestionKey);
+        setField(v, "corsOrigins",         corsOrigins);
+        setField(v, "cookieSecure",        cookieSecure);
         return v;
     }
 
     @Test
     void validConfigPassesValidation() throws Exception {
         buildValidator(GOOD_HOST, GOOD_PORT, GOOD_DB, GOOD_USER, GOOD_PASS,
+                GOOD_MIG_USER, GOOD_MIG_PASS,
                 GOOD_SECRET, GOOD_KEY, GOOD_CORS, true)
                 .validateProductionConfig();
     }
@@ -50,6 +56,7 @@ class ProductionConfigValidatorTest {
     void missingDbHostFailsValidation() throws Exception {
         assertThatThrownBy(() ->
                 buildValidator("", GOOD_PORT, GOOD_DB, GOOD_USER, GOOD_PASS,
+                        GOOD_MIG_USER, GOOD_MIG_PASS,
                         GOOD_SECRET, GOOD_KEY, GOOD_CORS, true)
                         .validateProductionConfig())
                 .isInstanceOf(IllegalStateException.class)
@@ -60,6 +67,7 @@ class ProductionConfigValidatorTest {
     void localhostDbHostFailsValidation() throws Exception {
         assertThatThrownBy(() ->
                 buildValidator("localhost", GOOD_PORT, GOOD_DB, GOOD_USER, GOOD_PASS,
+                        GOOD_MIG_USER, GOOD_MIG_PASS,
                         GOOD_SECRET, GOOD_KEY, GOOD_CORS, true)
                         .validateProductionConfig())
                 .isInstanceOf(IllegalStateException.class)
@@ -70,6 +78,7 @@ class ProductionConfigValidatorTest {
     void missingDbPortFailsValidation() throws Exception {
         assertThatThrownBy(() ->
                 buildValidator(GOOD_HOST, "", GOOD_DB, GOOD_USER, GOOD_PASS,
+                        GOOD_MIG_USER, GOOD_MIG_PASS,
                         GOOD_SECRET, GOOD_KEY, GOOD_CORS, true)
                         .validateProductionConfig())
                 .isInstanceOf(IllegalStateException.class)
@@ -80,6 +89,7 @@ class ProductionConfigValidatorTest {
     void invalidDbPortFailsValidation() throws Exception {
         assertThatThrownBy(() ->
                 buildValidator(GOOD_HOST, "not-a-port", GOOD_DB, GOOD_USER, GOOD_PASS,
+                        GOOD_MIG_USER, GOOD_MIG_PASS,
                         GOOD_SECRET, GOOD_KEY, GOOD_CORS, true)
                         .validateProductionConfig())
                 .isInstanceOf(IllegalStateException.class)
@@ -90,6 +100,7 @@ class ProductionConfigValidatorTest {
     void outOfRangeDbPortFailsValidation() throws Exception {
         assertThatThrownBy(() ->
                 buildValidator(GOOD_HOST, "99999", GOOD_DB, GOOD_USER, GOOD_PASS,
+                        GOOD_MIG_USER, GOOD_MIG_PASS,
                         GOOD_SECRET, GOOD_KEY, GOOD_CORS, true)
                         .validateProductionConfig())
                 .isInstanceOf(IllegalStateException.class)
@@ -100,6 +111,7 @@ class ProductionConfigValidatorTest {
     void placeholderDbPasswordScsentinelFails() throws Exception {
         assertThatThrownBy(() ->
                 buildValidator(GOOD_HOST, GOOD_PORT, GOOD_DB, GOOD_USER, "scsentinel",
+                        GOOD_MIG_USER, GOOD_MIG_PASS,
                         GOOD_SECRET, GOOD_KEY, GOOD_CORS, true)
                         .validateProductionConfig())
                 .isInstanceOf(IllegalStateException.class)
@@ -110,6 +122,7 @@ class ProductionConfigValidatorTest {
     void placeholderDbPasswordChangeme123Fails() throws Exception {
         assertThatThrownBy(() ->
                 buildValidator(GOOD_HOST, GOOD_PORT, GOOD_DB, GOOD_USER, "changeme123",
+                        GOOD_MIG_USER, GOOD_MIG_PASS,
                         GOOD_SECRET, GOOD_KEY, GOOD_CORS, true)
                         .validateProductionConfig())
                 .isInstanceOf(IllegalStateException.class)
@@ -117,9 +130,32 @@ class ProductionConfigValidatorTest {
     }
 
     @Test
+    void missingMigratorUsernameFails() throws Exception {
+        assertThatThrownBy(() ->
+                buildValidator(GOOD_HOST, GOOD_PORT, GOOD_DB, GOOD_USER, GOOD_PASS,
+                        "", GOOD_MIG_PASS,
+                        GOOD_SECRET, GOOD_KEY, GOOD_CORS, true)
+                        .validateProductionConfig())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DB_MIGRATOR_USERNAME");
+    }
+
+    @Test
+    void missingMigratorPasswordFails() throws Exception {
+        assertThatThrownBy(() ->
+                buildValidator(GOOD_HOST, GOOD_PORT, GOOD_DB, GOOD_USER, GOOD_PASS,
+                        GOOD_MIG_USER, "",
+                        GOOD_SECRET, GOOD_KEY, GOOD_CORS, true)
+                        .validateProductionConfig())
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("DB_MIGRATOR_PASSWORD");
+    }
+
+    @Test
     void shortJwtSecretFails() throws Exception {
         assertThatThrownBy(() ->
                 buildValidator(GOOD_HOST, GOOD_PORT, GOOD_DB, GOOD_USER, GOOD_PASS,
+                        GOOD_MIG_USER, GOOD_MIG_PASS,
                         "short", GOOD_KEY, GOOD_CORS, true)
                         .validateProductionConfig())
                 .isInstanceOf(IllegalStateException.class)
@@ -130,6 +166,7 @@ class ProductionConfigValidatorTest {
     void devOnlyJwtSecretFails() throws Exception {
         assertThatThrownBy(() ->
                 buildValidator(GOOD_HOST, GOOD_PORT, GOOD_DB, GOOD_USER, GOOD_PASS,
+                        GOOD_MIG_USER, GOOD_MIG_PASS,
                         "dev-only-secret-key-change-me-in-production-at-least-32-characters-long",
                         GOOD_KEY, GOOD_CORS, true)
                         .validateProductionConfig())
@@ -141,6 +178,7 @@ class ProductionConfigValidatorTest {
     void missingIngestionKeyFails() throws Exception {
         assertThatThrownBy(() ->
                 buildValidator(GOOD_HOST, GOOD_PORT, GOOD_DB, GOOD_USER, GOOD_PASS,
+                        GOOD_MIG_USER, GOOD_MIG_PASS,
                         GOOD_SECRET, "", GOOD_CORS, true)
                         .validateProductionConfig())
                 .isInstanceOf(IllegalStateException.class)
@@ -151,6 +189,7 @@ class ProductionConfigValidatorTest {
     void localhostCorsOriginFails() throws Exception {
         assertThatThrownBy(() ->
                 buildValidator(GOOD_HOST, GOOD_PORT, GOOD_DB, GOOD_USER, GOOD_PASS,
+                        GOOD_MIG_USER, GOOD_MIG_PASS,
                         GOOD_SECRET, GOOD_KEY, "http://localhost:5173", true)
                         .validateProductionConfig())
                 .isInstanceOf(IllegalStateException.class)
@@ -161,6 +200,7 @@ class ProductionConfigValidatorTest {
     void cookieSecureFalseFails() throws Exception {
         assertThatThrownBy(() ->
                 buildValidator(GOOD_HOST, GOOD_PORT, GOOD_DB, GOOD_USER, GOOD_PASS,
+                        GOOD_MIG_USER, GOOD_MIG_PASS,
                         GOOD_SECRET, GOOD_KEY, GOOD_CORS, false)
                         .validateProductionConfig())
                 .isInstanceOf(IllegalStateException.class)
@@ -171,6 +211,7 @@ class ProductionConfigValidatorTest {
     void missingCorsOriginsFails() throws Exception {
         assertThatThrownBy(() ->
                 buildValidator(GOOD_HOST, GOOD_PORT, GOOD_DB, GOOD_USER, GOOD_PASS,
+                        GOOD_MIG_USER, GOOD_MIG_PASS,
                         GOOD_SECRET, GOOD_KEY, "", true)
                         .validateProductionConfig())
                 .isInstanceOf(IllegalStateException.class)

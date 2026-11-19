@@ -30,6 +30,8 @@ import java.util.Set;
  *   <li>{@code DB_NAME} — must not be blank</li>
  *   <li>{@code DB_USERNAME} — must not be blank</li>
  *   <li>{@code DB_PASSWORD} — must not be blank or a known placeholder</li>
+ *   <li>{@code DB_MIGRATOR_USERNAME} — must not be blank</li>
+ *   <li>{@code DB_MIGRATOR_PASSWORD} — must not be blank</li>
  *   <li>{@code JWT_SECRET} — must be ≥ 32 bytes; not a dev placeholder</li>
  *   <li>{@code CI_INGESTION_API_KEY} — must be ≥ 32 bytes; not a dev placeholder</li>
  *   <li>{@code APP_CORS_ALLOWED_ORIGINS} — must be set; must not be a localhost value</li>
@@ -77,6 +79,12 @@ public class ProductionConfigValidator {
 
     @Value("${DB_PASSWORD:}")
     private String dbPassword;
+
+    @Value("${DB_MIGRATOR_USERNAME:}")
+    private String dbMigratorUsername;
+
+    @Value("${DB_MIGRATOR_PASSWORD:}")
+    private String dbMigratorPassword;
 
     @Value("${JWT_SECRET:}")
     private String jwtSecret;
@@ -133,6 +141,17 @@ public class ProductionConfigValidator {
             errors.add("DB_PASSWORD must be set (store in AWS Secrets Manager)");
         } else if (FORBIDDEN_PASSWORDS.contains(dbPassword.trim().toLowerCase())) {
             errors.add("DB_PASSWORD is a known placeholder value and must not be used in production");
+        }
+
+        // ── Flyway migration credentials ──────────────────────────────────
+        // Flyway connects as a separate privileged user (scs_migrator).
+        // These credentials are distinct from the runtime app credentials above.
+        if (isBlank(dbMigratorUsername)) {
+            errors.add("DB_MIGRATOR_USERNAME must be set (store in AWS Secrets Manager)");
+        }
+
+        if (isBlank(dbMigratorPassword)) {
+            errors.add("DB_MIGRATOR_PASSWORD must be set (store in AWS Secrets Manager)");
         }
 
         // ── JWT secret ────────────────────────────────────────

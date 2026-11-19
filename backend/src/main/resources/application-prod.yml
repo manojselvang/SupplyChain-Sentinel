@@ -15,6 +15,15 @@ spring:
       minimum-idle: ${DB_POOL_MIN:2}
       connection-timeout: 30000
       idle-timeout: 600000
+  flyway:
+    # Flyway runs as the privileged migration user (scs_migrator), not the
+    # restricted runtime user (scs_app). This keeps DDL and schema-change
+    # permissions out of the application connection pool entirely.
+    # DB_MIGRATOR_USERNAME and DB_MIGRATOR_PASSWORD must be supplied from
+    # Secrets Manager; Flyway inherits the datasource URL and driver from
+    # spring.datasource above.
+    user: ${DB_MIGRATOR_USERNAME}
+    password: ${DB_MIGRATOR_PASSWORD}
   jpa:
     show-sql: false
 

@@ -81,6 +81,8 @@ class ProductionConfigLifecycleTest {
             "DB_NAME=supplychain_sentinel",
             "DB_USERNAME=appuser",
             "DB_PASSWORD=MySecureRdsPassword123!",
+            "DB_MIGRATOR_USERNAME=scs_migrator",
+            "DB_MIGRATOR_PASSWORD=MigratorSecurePassword456!",
             "JWT_SECRET=production-safe-jwt-secret-at-least-32-bytes-long-for-testing",
             "CI_INGESTION_API_KEY=production-safe-ingestion-api-key-at-least-32-bytes",
             "APP_CORS_ALLOWED_ORIGINS=https://sentinel.example.com",
