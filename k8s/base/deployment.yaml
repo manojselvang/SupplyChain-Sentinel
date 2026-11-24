@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: scs-backend
+  namespace: scs
+  labels:
+    app.kubernetes.io/name: scs-backend
+    app.kubernetes.io/part-of: supplychain-sentinel
+spec:
+  replicas: 1
+  revisionHistoryLimit: 3
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: scs-backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: scs-backend
+        app.kubernetes.io/part-of: supplychain-sentinel
+    spec:
+      serviceAccountName: scs-backend
+      terminationGracePeriodSeconds: 60
+
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 999
+        runAsGroup: 999
+        seccompProfile:
+          type: RuntimeDefault
+
+      containers:
+        - name: backend
+          image: manojselvang/supplychain-sentinel-backend:v1.0.0@sha256:38b3458180248108e04ae5f82ad0027cad21cfb7284eb0e0b928fea71551406d
+          imagePullPolicy: IfNotPresent
+
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+
+          env:
+            - name: SPRING_PROFILES_ACTIVE
+              value: "prod"
+
+            - name: SPRING_CONFIG_IMPORT
+              value: "configtree:/mnt/secrets-store/"
+
+            - name: DB_PORT
+              value: "5432"
+
+            - name: SERVER_PORT
+              value: "8080"
+
+            - name: APP_COOKIE_SECURE
+              value: "true"
+
+            # Temporary placeholder until the frontend CloudFront
+            # distribution is created. Replace before frontend integration.
+            - name: APP_CORS_ALLOWED_ORIGINS
+              value: "https://scs-frontend-not-deployed.invalid"
+
+            - name: JAVA_TOOL_OPTIONS
+              value: "-XX:MaxRAMPercentage=70.0 -XX:+ExitOnOutOfMemoryError"
+
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+
+          startupProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+              scheme: HTTP
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 36
+
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: http
+              scheme: HTTP
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: http
+              scheme: HTTP
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+          volumeMounts:
+            - name: secrets-store
+              mountPath: /mnt/secrets-store
+              readOnly: true
+
+            - name: tmp
+              mountPath: /tmp
+
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: scs-backend-secrets
+
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 128Mi
